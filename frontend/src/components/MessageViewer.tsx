@@ -51,6 +51,16 @@ function formatDate(dateStr: string): string {
   }
 }
 
+// Display names for platforms (backend uses internal names)
+function getPlatformDisplayName(platform: string): string {
+  const displayNames: Record<string, string> = {
+    openai: 'ChatGPT',
+    claude: 'Claude',
+    raycast: 'Raycast',
+  };
+  return displayNames[platform] || platform;
+}
+
 // Copy icon
 const CopyIcon = () => (
   <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
@@ -211,6 +221,32 @@ function MessageContent({ content }: { content: string }) {
   );
 }
 
+// Copy button for entire message
+function MessageCopyButton({ content }: { content: string }) {
+  const [copied, setCopied] = useState(false);
+
+  const handleCopy = useCallback(async () => {
+    try {
+      await navigator.clipboard.writeText(content);
+      setCopied(true);
+      setTimeout(() => setCopied(false), 2000);
+    } catch (err) {
+      console.error('Failed to copy:', err);
+    }
+  }, [content]);
+
+  return (
+    <button
+      className={`message-copy-btn ${copied ? 'copied' : ''}`}
+      onClick={handleCopy}
+      type="button"
+      title="Copy message"
+    >
+      {copied ? <CheckIcon /> : <CopyIcon />}
+    </button>
+  );
+}
+
 function MessageViewer({ conversation }: MessageViewerProps) {
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
@@ -245,7 +281,7 @@ function MessageViewer({ conversation }: MessageViewerProps) {
         </h2>
         <div className="conversation-meta">
           <span className={`platform-badge ${platform}`}>
-            {platform}
+            {getPlatformDisplayName(platform)}
           </span>
           <span>{formatDate(conversation.created_at)}</span>
           {conversation.model && <span>Model: {conversation.model}</span>}
@@ -262,8 +298,9 @@ function MessageViewer({ conversation }: MessageViewerProps) {
               animationDelay: index < 10 ? `${index * 50}ms` : '500ms',
             }}
           >
+            <MessageCopyButton content={msg.content} />
             <div className="message-role">
-              {msg.role === 'user' ? 'You' : platform}
+              {msg.role === 'user' ? 'You' : getPlatformDisplayName(platform)}
             </div>
             <MessageContent content={msg.content} />
             {msg.media && msg.media.length > 0 && (

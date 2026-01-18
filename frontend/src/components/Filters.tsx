@@ -13,6 +13,16 @@ function formatCount(count: number): string {
   return count.toString();
 }
 
+// Display names for platforms (backend uses internal names)
+function getPlatformDisplayName(platform: string): string {
+  const displayNames: Record<string, string> = {
+    openai: 'ChatGPT',
+    claude: 'Claude',
+    raycast: 'Raycast',
+  };
+  return displayNames[platform] || platform;
+}
+
 function Filters({ stats, selectedPlatform, onPlatformChange }: FiltersProps) {
   const platforms = stats?.by_platform ? Object.keys(stats.by_platform) : [];
   const totalCount = stats?.total_conversations ?? 0;
@@ -38,7 +48,7 @@ function Filters({ stats, selectedPlatform, onPlatformChange }: FiltersProps) {
             onClick={() => onPlatformChange(platform)}
             data-platform={platform}
           >
-            {platform}
+            {getPlatformDisplayName(platform)}
             <span className="filter-count">{formatCount(count)}</span>
           </button>
         );

@@ -874,6 +874,48 @@ header h1 {
   background: var(--raycast);
 }
 
+/* Message copy button */
+.message-copy-btn {
+  position: absolute;
+  top: var(--space-3);
+  right: var(--space-3);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+  padding: 0;
+  background: var(--bg-tertiary);
+  border: 1px solid var(--border-default);
+  border-radius: var(--radius-md);
+  color: var(--text-muted);
+  cursor: pointer;
+  opacity: 0;
+  transition: all var(--transition-fast);
+}
+
+.message:hover .message-copy-btn {
+  opacity: 1;
+}
+
+.message-copy-btn:hover {
+  background: var(--bg-elevated);
+  border-color: var(--border-hover);
+  color: var(--text-primary);
+}
+
+.message-copy-btn.copied {
+  opacity: 1;
+  background: var(--success-muted);
+  border-color: var(--success);
+  color: var(--success);
+}
+
+.message-copy-btn svg {
+  width: 14px;
+  height: 14px;
+}
+
 .message-role {
   display: flex;
   align-items: center;

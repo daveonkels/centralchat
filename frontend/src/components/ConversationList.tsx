@@ -33,10 +33,20 @@ function formatDate(dateStr: string): string {
   }
 }
 
+// Display names for platforms (backend uses internal names)
+function getPlatformDisplayName(platform: string): string {
+  const displayNames: Record<string, string> = {
+    openai: 'ChatGPT',
+    claude: 'Claude',
+    raycast: 'Raycast',
+  };
+  return displayNames[platform] || platform;
+}
+
 function PlatformBadge({ platform }: { platform: string }) {
   return (
     <span className={`platform-badge ${platform}`}>
-      {platform}
+      {getPlatformDisplayName(platform)}
     </span>
   );
 }
