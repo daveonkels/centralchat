@@ -55,6 +55,7 @@ export interface Stats {
   total_messages: number;
   by_platform: Record<string, number>;
   imports: ImportRecord[];
+  last_imported: string | null;
 }
 
 export interface ImportRecord {

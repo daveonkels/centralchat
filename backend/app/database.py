@@ -319,4 +319,10 @@ def get_stats(conn: sqlite3.Connection) -> dict:
         ).fetchall()
     ]
 
+    # Get most recent import date
+    last_import = conn.execute(
+        "SELECT MAX(import_date) FROM imports"
+    ).fetchone()[0]
+    stats["last_imported"] = last_import
+
     return stats

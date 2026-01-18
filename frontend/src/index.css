@@ -284,6 +284,12 @@ header h1 {
   font-variant-numeric: tabular-nums;
 }
 
+.stats .last-imported {
+  color: var(--text-muted);
+  padding-right: var(--space-4);
+  border-right: 1px solid var(--border-subtle);
+}
+
 /* =============================================================================
    SEARCH
    ============================================================================= */

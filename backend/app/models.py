@@ -84,3 +84,4 @@ class StatsResponse(BaseModel):
     total_messages: int
     by_platform: dict[str, int]
     imports: list[dict]
+    last_imported: Optional[str] = None

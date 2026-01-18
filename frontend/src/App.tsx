@@ -14,6 +14,20 @@ import {
   Stats,
 } from './api/client';
 
+function formatLastImported(dateStr: string | null): string {
+  if (!dateStr) return '';
+  try {
+    const date = new Date(dateStr);
+    return date.toLocaleDateString('en-US', {
+      month: 'short',
+      day: 'numeric',
+      year: 'numeric',
+    });
+  } catch {
+    return '';
+  }
+}
+
 function App() {
   const [query, setQuery] = useState('');
   const [results, setResults] = useState<SearchResult[]>([]);
@@ -86,6 +100,11 @@ function App() {
         <div className="stats">
           {stats && (
             <>
+              {stats.last_imported && (
+                <span className="last-imported">
+                  Imported {formatLastImported(stats.last_imported)}
+                </span>
+              )}
               <span>{stats.total_conversations.toLocaleString()} conversations</span>
               <span>{stats.total_messages.toLocaleString()} messages</span>
               <button
