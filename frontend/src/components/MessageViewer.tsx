@@ -127,8 +127,22 @@ function CodeBlock({ code, language }: CodeBlockProps) {
   );
 }
 
+// Clean up OpenAI citation markers and other artifacts
+function cleanContent(text: string): string {
+  // Remove OpenAI citation markers - they use Private Use Area Unicode:
+  // \ue200 (opening), \ue201 (closing), \ue202 (separator like †)
+  // Pattern: \ue200cite\ue202turn0search1\ue201
+  return text
+    .replace(/\ue200[^\ue201]*\ue201/g, '')  // Private Use Area markers
+    .replace(/【[^】]*】/g, '')                // CJK bracket markers (fallback)
+    .replace(/  +/g, ' ')
+    .trim();
+}
+
 // Parse and render message content with code blocks
 function MessageContent({ content }: { content: string }) {
+  // Clean the content first
+  content = cleanContent(content);
   // Split content into parts: regular text and code blocks
   const parts: Array<{ type: 'text' | 'code'; content: string; language?: string }> = [];
 

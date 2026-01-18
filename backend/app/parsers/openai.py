@@ -12,6 +12,11 @@ class OpenAIParser(BaseParser):
 
     platform = "openai"
 
+    # Pattern to match OpenAI citation markers
+    # They use Private Use Area Unicode: \ue200 (open), \ue201 (close), \ue202 (†)
+    # Example: \ue200cite\ue202turn0search1\ue201
+    CITATION_PATTERN = re.compile(r'[\ue200-\ue2ff][^\ue201]*[\ue201]|【[^】]*】')
+
     @classmethod
     def can_parse(cls, path: Path) -> bool:
         """Check for OpenAI export signature: conversations.json with mapping structure."""
@@ -130,7 +135,10 @@ class OpenAIParser(BaseParser):
                                     media_refs.append(media_ref)
                     text = "\n".join(text_parts)
 
-                if text.strip():
+                # Clean up citation markers and other artifacts
+                text = cls._clean_content(text)
+
+                if text:
                     author = message.get("author", {})
                     role = cls._normalize_role(author.get("role", ""))
 
@@ -189,6 +197,15 @@ class OpenAIParser(BaseParser):
             filename=None,
             metadata=None,
         )
+
+    @classmethod
+    def _clean_content(cls, text: str) -> str:
+        """Remove OpenAI citation markers and clean up text."""
+        # Remove citation markers like 【cite†turn0search1】
+        text = cls.CITATION_PATTERN.sub('', text)
+        # Clean up any double spaces left behind
+        text = re.sub(r'  +', ' ', text)
+        return text.strip()
 
     @staticmethod
     def _normalize_role(role: str) -> str:

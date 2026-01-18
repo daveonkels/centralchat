@@ -11,6 +11,15 @@ interface ConversationListProps {
   isSearchMode: boolean;
 }
 
+// Clean up OpenAI citation markers from text/HTML
+function cleanContent(text: string): string {
+  // OpenAI uses Private Use Area Unicode: \ue200 (open), \ue201 (close), \ue202 (†)
+  return text
+    .replace(/\ue200[^\ue201]*\ue201/g, '')  // Private Use Area markers
+    .replace(/【[^】]*】/g, '')                // CJK bracket markers (fallback)
+    .replace(/  +/g, ' ');
+}
+
 function formatDate(dateStr: string): string {
   try {
     const date = new Date(dateStr);
@@ -183,7 +192,7 @@ function ConversationList({
                   </div>
                   <div
                     className="result-snippet"
-                    dangerouslySetInnerHTML={{ __html: result.snippet }}
+                    dangerouslySetInnerHTML={{ __html: cleanContent(result.snippet) }}
                   />
                   <div className="result-meta">
                     {result.role && <span>{result.role}</span>}
@@ -252,7 +261,7 @@ function ConversationList({
                   <span>{conv.title || 'Untitled'}</span>
                 </div>
                 {conv.summary && (
-                  <div className="result-snippet">{conv.summary}</div>
+                  <div className="result-snippet">{cleanContent(conv.summary)}</div>
                 )}
                 <div className="result-meta">
                   {conv.message_count !== undefined && (
