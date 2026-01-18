@@ -1,6 +1,7 @@
 services:
-  backend:
+  central-chat-backend:
     build: ./backend
+    container_name: central-chat-backend
     volumes:
       - ./data:/app/data
       - ./imports:/app/imports:ro
@@ -15,9 +16,10 @@ services:
       timeout: 10s
       retries: 3
 
-  frontend:
+  central-chat-frontend:
     build: ./frontend
+    container_name: central-chat-frontend
     ports:
       - "3000:80"
     depends_on:
-      - backend
+      - central-chat-backend
