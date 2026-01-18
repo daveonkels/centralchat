@@ -2,9 +2,9 @@
 
 A local web application to search across your AI chat history from ChatGPT, Claude, and Raycast.
 
-## Quick Start
+## Quick Start (Local)
 
-### Using Docker Compose (Recommended)
+### Using Docker Compose
 
 ```bash
 # Build and start
@@ -38,6 +38,91 @@ npm install
 npm run dev
 ```
 
+## Server Deployment (Traefik)
+
+For deployment to a server with an existing Traefik + Docker Compose setup:
+
+### 1. Copy project and build images
+
+```bash
+# Copy to server
+rsync -avz --exclude 'imports/*/' --exclude 'node_modules' --exclude '.venv' \
+  --exclude 'data/*.db' --exclude '.git' \
+  ./ yourserver:~/apps/central-chat/
+
+# SSH to server and build images
+ssh yourserver
+cd ~/apps/central-chat
+docker build -t central-chat-backend:latest ./backend
+docker build -t central-chat-frontend:latest ./frontend
+```
+
+### 2. Create data directories
+
+```bash
+mkdir -p ~/data/central-chat/imports
+```
+
+### 3. Add to existing docker-compose.yml
+
+Add these services to your main `docker-compose.yml`:
+
+```yaml
+## CENTRAL-CHAT (AI Chat Archive)
+  central-chat-backend:
+    image: central-chat-backend:latest
+    container_name: central-chat-backend
+    restart: unless-stopped
+    volumes:
+      - /home/cooper/data/central-chat:/app/data
+      - /home/cooper/data/central-chat/imports:/app/imports:ro
+    environment:
+      - DATABASE_PATH=/app/data/central-chat.db
+      - IMPORTS_PATH=/app/imports
+    networks:
+      - proxy
+
+  central-chat-frontend:
+    image: central-chat-frontend:latest
+    container_name: central-chat-frontend
+    restart: unless-stopped
+    depends_on:
+      - central-chat-backend
+    networks:
+      - proxy
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.central-chat.entrypoints=http"
+      - "traefik.http.routers.central-chat.rule=Host(`central-chat.example.com`)"
+      - "traefik.http.middlewares.central-chat-https-redirect.redirectscheme.scheme=https"
+      - "traefik.http.routers.central-chat.middlewares=central-chat-https-redirect"
+      - "traefik.http.routers.central-chat-secure.entrypoints=https"
+      - "traefik.http.routers.central-chat-secure.rule=Host(`central-chat.example.com`)"
+      - "traefik.http.routers.central-chat-secure.tls=true"
+      - "traefik.http.routers.central-chat-secure.service=central-chat"
+      - "traefik.http.services.central-chat.loadbalancer.server.port=80"
+      - "traefik.docker.network=proxy"
+## END
+```
+
+### 4. Start services
+
+```bash
+docker compose up -d central-chat-backend central-chat-frontend
+```
+
+### 5. Upload exports and import
+
+```bash
+# From local machine, upload exports
+rsync -avz imports/claude-*/ yourserver:~/data/central-chat/imports/claude-export/
+rsync -avz imports/openai-*/ yourserver:~/data/central-chat/imports/openai-export/
+rsync -avz imports/raycast-*/ yourserver:~/data/central-chat/imports/raycast-export/
+
+# Trigger import via API
+curl -X POST https://central-chat.example.com/api/import/run
+```
+
 ## Usage
 
 ### Importing Chats
@@ -47,7 +132,7 @@ npm run dev
    - **ChatGPT**: Export from OpenAI Settings > Data Controls > Export
    - **Raycast**: Export from Raycast AI Chat History
 
-2. Open the web UI at http://localhost:3000
+2. Open the web UI
 
 3. Click "Import" and then "Run Import"
 
@@ -61,7 +146,7 @@ npm run dev
 
 ```
 central-chat/
-├── docker-compose.yml      # Run with: docker compose up
+├── docker-compose.yml      # Local dev: docker compose up
 ├── backend/
 │   ├── app/
 │   │   ├── main.py         # FastAPI app
@@ -75,6 +160,7 @@ central-chat/
 │   │   ├── App.tsx         # Main React component
 │   │   ├── components/     # UI components
 │   │   └── api/            # API client
+│   ├── nginx.conf          # Proxies /api to backend
 │   └── Dockerfile
 ├── data/                   # SQLite database (auto-created)
 └── imports/                # Drop export folders here
