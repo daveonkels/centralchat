@@ -103,7 +103,7 @@ function App() {
         <ImportPanel onImportComplete={handleImportComplete} />
       )}
 
-      <SearchBar onSearch={handleSearch} />
+      <SearchBar onSearch={handleSearch} loading={loading && !!query} />
 
       <Filters
         stats={stats}
