@@ -28,6 +28,12 @@ function formatLastImported(dateStr: string | null): string {
   }
 }
 
+// Parse conversation ID from URL path like /c/{id}
+function getConversationIdFromUrl(): string | null {
+  const match = window.location.pathname.match(/^\/c\/(.+)$/);
+  return match ? decodeURIComponent(match[1]) : null;
+}
+
 function App() {
   const [query, setQuery] = useState('');
   const [results, setResults] = useState<SearchResult[]>([]);
@@ -41,6 +47,33 @@ function App() {
   // Load stats on mount
   useEffect(() => {
     getStats().then(setStats).catch(console.error);
+  }, []);
+
+  // Load conversation from URL on mount
+  useEffect(() => {
+    const conversationId = getConversationIdFromUrl();
+    if (conversationId) {
+      getConversation(conversationId)
+        .then(setSelectedConversation)
+        .catch(console.error);
+    }
+  }, []);
+
+  // Handle browser back/forward navigation
+  useEffect(() => {
+    const handlePopState = () => {
+      const conversationId = getConversationIdFromUrl();
+      if (conversationId) {
+        getConversation(conversationId)
+          .then(setSelectedConversation)
+          .catch(console.error);
+      } else {
+        setSelectedConversation(null);
+      }
+    };
+
+    window.addEventListener('popstate', handlePopState);
+    return () => window.removeEventListener('popstate', handlePopState);
   }, []);
 
   // Load conversations when no search query
@@ -78,6 +111,9 @@ function App() {
     try {
       const conv = await getConversation(conversationId);
       setSelectedConversation(conv);
+      // Update URL without triggering navigation
+      const newUrl = `/c/${encodeURIComponent(conversationId)}`;
+      window.history.pushState({ conversationId }, '', newUrl);
     } catch (error) {
       console.error('Failed to load conversation:', error);
     }
