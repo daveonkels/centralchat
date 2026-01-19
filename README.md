@@ -2,6 +2,17 @@
 
 A local web application to search across your AI chat history from ChatGPT, Claude, and Raycast.
 
+## Features
+
+- **Full-text search** across all conversations and messages with SQLite FTS5
+- **Platform-specific theming** - Claude (amber), ChatGPT (teal), and Raycast (rose) each have distinct color accents
+- **Deep linking** - each conversation has a shareable URL (`/c/{id}`)
+- **Syntax highlighting** for code blocks with one-click copy
+- **Copy message button** - hover any message to copy its content
+- **Virtualized lists** - smooth scrolling with thousands of conversations
+- **Last imported date** - track when data was last updated
+- **Keyboard shortcuts** - `Cmd+K` to focus search
+
 ## Quick Start (Local)
 
 ### Using Docker Compose
