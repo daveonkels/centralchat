@@ -42,6 +42,15 @@ class RaycastParser(BaseParser):
             title = session.get("title", "")
             index = session.get("index", 0)
 
+            # Use session date if available, otherwise fall back to export date
+            # New format has per-session dates (YYYY-MM-DD), old format doesn't
+            session_date = session.get("date")
+            if session_date:
+                # Convert YYYY-MM-DD to ISO format
+                created_at = f"{session_date}T00:00:00"
+            else:
+                created_at = export_date
+
             # Generate a deterministic ID based on title and index
             id_source = f"{title}:{index}:{export_date}"
             conv_id = hashlib.sha256(id_source.encode()).hexdigest()[:32]
@@ -53,7 +62,7 @@ class RaycastParser(BaseParser):
                 id=conv_id,
                 platform=cls.platform,
                 title=title,
-                created_at=export_date,
+                created_at=created_at,
                 updated_at=None,
                 summary=None,
                 model=model,
@@ -75,7 +84,7 @@ class RaycastParser(BaseParser):
                     conversation_id=conv_id,
                     role=role,
                     content=content,
-                    created_at=export_date,  # No per-message timestamps
+                    created_at=created_at,  # Use session date when available
                     sequence=seq,
                     parent_id=None,
                     metadata=None,
