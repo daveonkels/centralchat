@@ -39,6 +39,17 @@ def get_parser(platform: str):
     return None
 
 
+def resolve_import_folder(folder_name: str) -> Path | None:
+    """Resolve a folder under IMPORTS_PATH, preventing path traversal."""
+    imports_path = Path(IMPORTS_PATH).resolve()
+    target = (imports_path / folder_name).resolve()
+    try:
+        target.relative_to(imports_path)
+    except ValueError:
+        return None
+    return target
+
+
 @router.get("/scan", response_model=ImportScanResult)
 def scan_imports():
     """Scan the imports directory for export folders."""
@@ -78,8 +89,12 @@ def run_import(background_tasks: BackgroundTasks):
         if not platform:
             continue
 
-        status = import_export(folder, platform)
+        status = import_export(folder, platform, rebuild_fts=False)
         results.append(status)
+
+    if results:
+        with get_connection() as conn:
+            rebuild_fts_index(conn)
 
     return results
 
@@ -87,15 +102,14 @@ def run_import(background_tasks: BackgroundTasks):
 @router.post("/run/{folder_name}", response_model=ImportStatus)
 def run_import_single(folder_name: str):
     """Run import for a specific export folder."""
-    imports_path = Path(IMPORTS_PATH)
-    folder = imports_path / folder_name
+    folder = resolve_import_folder(folder_name)
 
-    if not folder.exists() or not folder.is_dir():
+    if not folder or not folder.exists() or not folder.is_dir():
         return ImportStatus(
             platform="unknown",
-            source_path=str(folder),
+            source_path=str(folder_name),
             status="error",
-            errors=[f"Folder not found: {folder_name}"],
+            errors=["Folder not found or invalid path"],
         )
 
     platform = detect_platform(folder)
@@ -107,10 +121,10 @@ def run_import_single(folder_name: str):
             errors=["Could not detect export format"],
         )
 
-    return import_export(folder, platform)
+    return import_export(folder, platform, rebuild_fts=True)
 
 
-def import_export(folder: Path, platform: str) -> ImportStatus:
+def import_export(folder: Path, platform: str, rebuild_fts: bool = True) -> ImportStatus:
     """Import an export folder."""
     parser = get_parser(platform)
     if not parser:
@@ -174,7 +188,8 @@ def import_export(folder: Path, platform: str) -> ImportStatus:
             conn.commit()
 
             # Rebuild FTS index
-            rebuild_fts_index(conn)
+            if rebuild_fts:
+                rebuild_fts_index(conn)
 
             status.conversations_imported = conversations_imported
             status.messages_imported = messages_imported

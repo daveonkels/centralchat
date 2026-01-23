@@ -9,7 +9,7 @@ services:
       - DATABASE_PATH=/app/data/central-chat.db
       - IMPORTS_PATH=/app/imports
     ports:
-      - "8000:8000"
+      - "127.0.0.1:8000:8000"
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:8000/api/health"]
       interval: 30s
@@ -20,6 +20,6 @@ services:
     build: ./frontend
     container_name: central-chat-frontend
     ports:
-      - "3000:80"
+      - "127.0.0.1:3000:80"
     depends_on:
       - central-chat-backend

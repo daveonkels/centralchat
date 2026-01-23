@@ -1,7 +1,8 @@
-from fastapi import APIRouter, Query
+import sqlite3
+from fastapi import APIRouter, Query, HTTPException
 from typing import Optional
 
-from ..database import get_connection, search
+from ..database import get_connection, search, count_search_results
 from ..models import SearchResponse, SearchResult
 
 router = APIRouter(prefix="/api/search", tags=["search"])
@@ -16,11 +17,15 @@ def search_chats(
     role: Optional[str] = Query(None, description="Filter by message role"),
 ):
     """Search across all messages and conversation titles."""
-    with get_connection() as conn:
-        results = search(conn, q, limit=limit, offset=offset, platform=platform, role=role)
+    try:
+        with get_connection() as conn:
+            results = search(conn, q, limit=limit, offset=offset, platform=platform, role=role)
+            total = count_search_results(conn, q, platform=platform, role=role)
+    except sqlite3.OperationalError:
+        raise HTTPException(status_code=400, detail="Invalid search query")
 
     return SearchResponse(
         results=[SearchResult(**r) for r in results],
-        total=len(results),
+        total=total,
         query=q,
     )

@@ -25,6 +25,8 @@ docker compose up -d
 open http://localhost:3000
 ```
 
+Note: Docker Compose binds to `127.0.0.1` by default for local-only access. If you want to expose it on your network, change the port mappings in `docker-compose.yml` and add authentication at the proxy.
+
 ### Manual Setup
 
 **Backend (requires Python 3.10-3.12):**

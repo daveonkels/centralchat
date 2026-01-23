@@ -11,6 +11,9 @@ interface ConversationListProps {
   isSearchMode: boolean;
 }
 
+const HIGHLIGHT_START = '__CC_HL_START__';
+const HIGHLIGHT_END = '__CC_HL_END__';
+
 // Clean up OpenAI citation markers from text/HTML
 function cleanContent(text: string): string {
   // OpenAI uses Private Use Area Unicode: \ue200 (open), \ue201 (close), \ue202 (†)
@@ -18,6 +21,39 @@ function cleanContent(text: string): string {
     .replace(/\ue200[^\ue201]*\ue201/g, '')  // Private Use Area markers
     .replace(/【[^】]*】/g, '')                // CJK bracket markers (fallback)
     .replace(/  +/g, ' ');
+}
+
+function renderSnippet(snippet: string) {
+  const cleaned = cleanContent(snippet);
+  if (!cleaned) return null;
+
+  const nodes: JSX.Element[] = [];
+  let remaining = cleaned;
+  let key = 0;
+
+  while (remaining.length > 0) {
+    const startIndex = remaining.indexOf(HIGHLIGHT_START);
+    if (startIndex === -1) {
+      nodes.push(<span key={`t-${key++}`}>{remaining}</span>);
+      break;
+    }
+
+    if (startIndex > 0) {
+      nodes.push(<span key={`t-${key++}`}>{remaining.slice(0, startIndex)}</span>);
+    }
+
+    const afterStart = remaining.slice(startIndex + HIGHLIGHT_START.length);
+    const endIndex = afterStart.indexOf(HIGHLIGHT_END);
+    if (endIndex === -1) {
+      nodes.push(<span key={`t-${key++}`}>{afterStart}</span>);
+      break;
+    }
+
+    nodes.push(<mark key={`m-${key++}`}>{afterStart.slice(0, endIndex)}</mark>);
+    remaining = afterStart.slice(endIndex + HIGHLIGHT_END.length);
+  }
+
+  return nodes;
 }
 
 function formatDate(dateStr: string): string {
@@ -200,10 +236,9 @@ function ConversationList({
                     <PlatformBadge platform={result.platform} />
                     <span>{result.conversation_title || 'Untitled'}</span>
                   </div>
-                  <div
-                    className="result-snippet"
-                    dangerouslySetInnerHTML={{ __html: cleanContent(result.snippet) }}
-                  />
+                  <div className="result-snippet">
+                    {renderSnippet(result.snippet)}
+                  </div>
                   <div className="result-meta">
                     {result.role && <span>{result.role}</span>}
                     <span>{formatDate(result.conversation_date)}</span>

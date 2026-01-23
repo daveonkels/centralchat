@@ -4,6 +4,8 @@ from pathlib import Path
 from contextlib import contextmanager
 
 DATABASE_PATH = os.environ.get("DATABASE_PATH", "/app/data/central-chat.db")
+HIGHLIGHT_START = "__CC_HL_START__"
+HIGHLIGHT_END = "__CC_HL_END__"
 
 SCHEMA = """
 -- Source exports tracking
@@ -164,38 +166,41 @@ def insert_media_ref(conn: sqlite3.Connection, media: dict):
 
 def rebuild_fts_index(conn: sqlite3.Connection):
     """Rebuild the full-text search index from scratch."""
-    conn.execute("DELETE FROM search_fts")
+    try:
+        conn.execute("BEGIN")
+        conn.execute("DELETE FROM search_fts")
 
-    # Index conversation titles
-    conn.execute(
-        """
-        INSERT INTO search_fts (content, title, conversation_id, message_id, entry_type)
-        SELECT title, title, id, NULL, 'conversation'
-        FROM conversations
-        WHERE title IS NOT NULL AND title != ''
-        """
-    )
+        # Index conversation titles
+        conn.execute(
+            """
+            INSERT INTO search_fts (content, title, conversation_id, message_id, entry_type)
+            SELECT title, title, id, NULL, 'conversation'
+            FROM conversations
+            WHERE title IS NOT NULL AND title != ''
+            """
+        )
 
-    # Index messages
-    conn.execute(
-        """
-        INSERT INTO search_fts (content, title, conversation_id, message_id, entry_type)
-        SELECT m.content, c.title, m.conversation_id, m.id, 'message'
-        FROM messages m
-        JOIN conversations c ON m.conversation_id = c.id
-        WHERE m.content IS NOT NULL AND m.content != ''
-        """
-    )
+        # Index messages
+        conn.execute(
+            """
+            INSERT INTO search_fts (content, title, conversation_id, message_id, entry_type)
+            SELECT m.content, c.title, m.conversation_id, m.id, 'message'
+            FROM messages m
+            JOIN conversations c ON m.conversation_id = c.id
+            WHERE m.content IS NOT NULL AND m.content != ''
+            """
+        )
 
-    conn.commit()
+        conn.commit()
+    except Exception:
+        conn.rollback()
+        raise
 
 
-def search(conn: sqlite3.Connection, query: str, limit: int = 50, offset: int = 0,
-           platform: str = None, role: str = None) -> list[dict]:
-    """Search messages and conversation titles."""
-    params = [query]
-
+def _build_search_filters(platform: str | None, role: str | None) -> tuple[str, list]:
     where_clauses = []
+    params = []
+
     if platform:
         where_clauses.append("c.platform = ?")
         params.append(platform)
@@ -207,6 +212,16 @@ def search(conn: sqlite3.Connection, query: str, limit: int = 50, offset: int = 
     if where_clauses:
         where_sql = "AND " + " AND ".join(where_clauses)
 
+    return where_sql, params
+
+
+def search(conn: sqlite3.Connection, query: str, limit: int = 50, offset: int = 0,
+           platform: str = None, role: str = None) -> list[dict]:
+    """Search messages and conversation titles."""
+    params = [query]
+    where_sql, filter_params = _build_search_filters(platform, role)
+    params.extend(filter_params)
+
     params.extend([limit, offset])
 
     results = conn.execute(
@@ -215,7 +230,7 @@ def search(conn: sqlite3.Connection, query: str, limit: int = 50, offset: int = 
             s.conversation_id,
             s.message_id,
             s.entry_type,
-            snippet(search_fts, 0, '<mark>', '</mark>', '...', 32) as snippet,
+            snippet(search_fts, 0, '{HIGHLIGHT_START}', '{HIGHLIGHT_END}', '...', 32) as snippet,
             c.title as conversation_title,
             c.platform,
             c.created_at as conversation_date,
@@ -235,6 +250,28 @@ def search(conn: sqlite3.Connection, query: str, limit: int = 50, offset: int = 
     ).fetchall()
 
     return [dict(r) for r in results]
+
+
+def count_search_results(conn: sqlite3.Connection, query: str,
+                         platform: str = None, role: str = None) -> int:
+    """Count total search results for pagination."""
+    params = [query]
+    where_sql, filter_params = _build_search_filters(platform, role)
+    params.extend(filter_params)
+
+    result = conn.execute(
+        f"""
+        SELECT COUNT(*) as count
+        FROM search_fts s
+        JOIN conversations c ON s.conversation_id = c.id
+        LEFT JOIN messages m ON s.message_id = m.id
+        WHERE search_fts MATCH ?
+        {where_sql}
+        """,
+        params,
+    ).fetchone()[0]
+
+    return result
 
 
 def get_conversation(conn: sqlite3.Connection, conv_id: str) -> dict | None:
