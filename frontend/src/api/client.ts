@@ -92,11 +92,12 @@ export interface DetectedExport {
 
 export async function search(
   query: string,
-  options: { platform?: string; role?: string; limit?: number; offset?: number } = {}
+  options: { platform?: string; role?: string; before?: string; limit?: number; offset?: number } = {}
 ): Promise<SearchResponse> {
   const params = new URLSearchParams({ q: query });
   if (options.platform) params.set('platform', options.platform);
   if (options.role) params.set('role', options.role);
+  if (options.before) params.set('before', options.before);
   if (options.limit) params.set('limit', options.limit.toString());
   if (options.offset) params.set('offset', options.offset.toString());
 

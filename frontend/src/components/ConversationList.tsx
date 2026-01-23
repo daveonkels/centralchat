@@ -10,6 +10,8 @@ interface ConversationListProps {
   selectedIndex?: number | null;
   onSelect: (id: string, index: number) => void;
   isSearchMode: boolean;
+  suggestions?: string[];
+  onSuggestionSelect?: (value: string) => void;
 }
 
 const HIGHLIGHT_START = '__CC_HL_START__';
@@ -126,6 +128,8 @@ function ConversationList({
   selectedIndex,
   onSelect,
   isSearchMode,
+  suggestions = [],
+  onSuggestionSelect,
 }: ConversationListProps) {
   const parentRef = useRef<HTMLDivElement>(null);
   const [animatedItems, setAnimatedItems] = useState<Set<string>>(new Set());
@@ -205,7 +209,24 @@ function ConversationList({
           <div className="empty-state">
             <SearchEmptyIcon />
             <h3>No results found</h3>
-            <p>Try different keywords or check your spelling</p>
+            <p>Try different keywords or remove filters</p>
+            {suggestions.length > 0 && (
+              <div className="search-suggestions">
+                <div className="search-suggestions-label">Suggested queries</div>
+                <div className="search-suggestions-list">
+                  {suggestions.map((suggestion) => (
+                    <button
+                      key={suggestion}
+                      className="search-suggestion-chip"
+                      onClick={() => onSuggestionSelect?.(suggestion)}
+                      type="button"
+                    >
+                      {suggestion}
+                    </button>
+                  ))}
+                </div>
+              </div>
+            )}
           </div>
         </div>
       );

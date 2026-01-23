@@ -4,6 +4,7 @@ from pathlib import Path
 from contextlib import contextmanager
 
 DATABASE_PATH = os.environ.get("DATABASE_PATH", "/app/data/central-chat.db")
+MATCH_ALL_QUERY = "__cc_match_all__"
 HIGHLIGHT_START = "__CC_HL_START__"
 HIGHLIGHT_END = "__CC_HL_END__"
 
@@ -197,7 +198,11 @@ def rebuild_fts_index(conn: sqlite3.Connection):
         raise
 
 
-def _build_search_filters(platform: str | None, role: str | None) -> tuple[str, list]:
+def _build_search_filters(
+    platform: str | None,
+    role: str | None,
+    before: str | None,
+) -> tuple[str, list]:
     where_clauses = []
     params = []
 
@@ -207,6 +212,9 @@ def _build_search_filters(platform: str | None, role: str | None) -> tuple[str, 
     if role:
         where_clauses.append("m.role = ?")
         params.append(role)
+    if before:
+        where_clauses.append("COALESCE(m.created_at, c.created_at) <= ?")
+        params.append(before)
 
     where_sql = ""
     if where_clauses:
@@ -216,60 +224,98 @@ def _build_search_filters(platform: str | None, role: str | None) -> tuple[str, 
 
 
 def search(conn: sqlite3.Connection, query: str, limit: int = 50, offset: int = 0,
-           platform: str = None, role: str = None) -> list[dict]:
+           platform: str = None, role: str = None, before: str = None) -> list[dict]:
     """Search messages and conversation titles."""
-    params = [query]
-    where_sql, filter_params = _build_search_filters(platform, role)
-    params.extend(filter_params)
+    where_sql, filter_params = _build_search_filters(platform, role, before)
 
-    params.extend([limit, offset])
-
-    results = conn.execute(
-        f"""
-        SELECT
-            s.conversation_id,
-            s.message_id,
-            s.entry_type,
-            snippet(search_fts, 0, '{HIGHLIGHT_START}', '{HIGHLIGHT_END}', '...', 32) as snippet,
-            c.title as conversation_title,
-            c.platform,
-            c.created_at as conversation_date,
-            m.role,
-            m.content,
-            m.created_at as message_date,
-            bm25(search_fts) as rank
-        FROM search_fts s
-        JOIN conversations c ON s.conversation_id = c.id
-        LEFT JOIN messages m ON s.message_id = m.id
-        WHERE search_fts MATCH ?
-        {where_sql}
-        ORDER BY rank
-        LIMIT ? OFFSET ?
-        """,
-        params,
-    ).fetchall()
+    if query == MATCH_ALL_QUERY:
+        params = [*filter_params, limit, offset]
+        results = conn.execute(
+            f"""
+            SELECT
+                s.conversation_id,
+                s.message_id,
+                s.entry_type,
+                substr(s.content, 1, 160) as snippet,
+                c.title as conversation_title,
+                c.platform,
+                c.created_at as conversation_date,
+                m.role,
+                m.content,
+                m.created_at as message_date,
+                0 as rank
+            FROM search_fts s
+            JOIN conversations c ON s.conversation_id = c.id
+            LEFT JOIN messages m ON s.message_id = m.id
+            WHERE 1=1
+            {where_sql}
+            ORDER BY c.created_at DESC
+            LIMIT ? OFFSET ?
+            """,
+            params,
+        ).fetchall()
+    else:
+        params = [query, *filter_params, limit, offset]
+        results = conn.execute(
+            f"""
+            SELECT
+                s.conversation_id,
+                s.message_id,
+                s.entry_type,
+                snippet(search_fts, 0, '{HIGHLIGHT_START}', '{HIGHLIGHT_END}', '...', 32) as snippet,
+                c.title as conversation_title,
+                c.platform,
+                c.created_at as conversation_date,
+                m.role,
+                m.content,
+                m.created_at as message_date,
+                bm25(search_fts) as rank
+            FROM search_fts s
+            JOIN conversations c ON s.conversation_id = c.id
+            LEFT JOIN messages m ON s.message_id = m.id
+            WHERE search_fts MATCH ?
+            {where_sql}
+            ORDER BY rank
+            LIMIT ? OFFSET ?
+            """,
+            params,
+        ).fetchall()
 
     return [dict(r) for r in results]
 
 
 def count_search_results(conn: sqlite3.Connection, query: str,
-                         platform: str = None, role: str = None) -> int:
+                         platform: str = None, role: str = None,
+                         before: str = None) -> int:
     """Count total search results for pagination."""
-    params = [query]
-    where_sql, filter_params = _build_search_filters(platform, role)
-    params.extend(filter_params)
+    where_sql, filter_params = _build_search_filters(platform, role, before)
 
-    result = conn.execute(
-        f"""
-        SELECT COUNT(*) as count
-        FROM search_fts s
-        JOIN conversations c ON s.conversation_id = c.id
-        LEFT JOIN messages m ON s.message_id = m.id
-        WHERE search_fts MATCH ?
-        {where_sql}
-        """,
-        params,
-    ).fetchone()[0]
+    if query == MATCH_ALL_QUERY:
+        params = [*filter_params]
+        result = conn.execute(
+            f"""
+            SELECT COUNT(*) as count
+            FROM search_fts s
+            JOIN conversations c ON s.conversation_id = c.id
+            LEFT JOIN messages m ON s.message_id = m.id
+            WHERE 1=1
+            {where_sql}
+            """,
+            params,
+        ).fetchone()[0]
+    else:
+        params = [query, *filter_params]
+        result = conn.execute(
+            f"""
+            SELECT COUNT(*) as count
+            FROM search_fts s
+            JOIN conversations c ON s.conversation_id = c.id
+            LEFT JOIN messages m ON s.message_id = m.id
+            WHERE search_fts MATCH ?
+            {where_sql}
+            """,
+            params,
+        ).fetchone()[0]
 
     return result
 

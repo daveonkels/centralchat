@@ -1,8 +1,11 @@
-import { useState, useEffect, useRef, useCallback } from 'react';
+import { useEffect, useRef, useCallback } from 'react';
 
 interface SearchBarProps {
-  onSearch: (query: string) => void;
+  value: string;
+  onChange: (query: string) => void;
   loading?: boolean;
+  recentSearches?: string[];
+  onSelectRecent?: (query: string) => void;
 }
 
 // Search icon SVG
@@ -36,18 +39,14 @@ const XIcon = () => (
   </svg>
 );
 
-function SearchBar({ onSearch, loading = false }: SearchBarProps) {
-  const [value, setValue] = useState('');
+function SearchBar({
+  value,
+  onChange,
+  loading = false,
+  recentSearches = [],
+  onSelectRecent,
+}: SearchBarProps) {
   const inputRef = useRef<HTMLInputElement>(null);
-
-  // Debounce search
-  useEffect(() => {
-    const timer = setTimeout(() => {
-      onSearch(value);
-    }, 300);
-
-    return () => clearTimeout(timer);
-  }, [value, onSearch]);
 
   // Keyboard shortcut: Cmd+K or Ctrl+K to focus search
   useEffect(() => {
@@ -67,7 +66,7 @@ function SearchBar({ onSearch, loading = false }: SearchBarProps) {
       // Escape to clear and blur
       if (e.key === 'Escape' && document.activeElement === inputRef.current) {
         if (value) {
-          setValue('');
+          onChange('');
         } else {
           inputRef.current?.blur();
         }
@@ -76,12 +75,12 @@ function SearchBar({ onSearch, loading = false }: SearchBarProps) {
 
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [value]);
+  }, [value, onChange]);
 
   const handleClear = useCallback(() => {
-    setValue('');
+    onChange('');
     inputRef.current?.focus();
-  }, []);
+  }, [onChange]);
 
   const isMac = typeof navigator !== 'undefined' && /Mac|iPod|iPhone|iPad/.test(navigator.platform);
 
@@ -95,7 +94,7 @@ function SearchBar({ onSearch, loading = false }: SearchBarProps) {
           className="search-input"
           placeholder="Search across all your chats..."
           value={value}
-          onChange={(e) => setValue(e.target.value)}
+          onChange={(e) => onChange(e.target.value)}
           autoFocus
         />
         <div className="search-actions">
@@ -116,6 +115,34 @@ function SearchBar({ onSearch, loading = false }: SearchBarProps) {
             </div>
           )}
         </div>
+      </div>
+
+      <div className="search-extras">
+        <div className="search-help">
+          <span className="search-help-label">Operators:</span>
+          <code>platform:openai</code>
+          <code>role:user</code>
+          <code>from:assistant</code>
+          <code>before:2024-01-01</code>
+        </div>
+
+        {recentSearches.length > 0 && (
+          <div className="search-recents">
+            <span className="search-recents-label">Recent</span>
+            <div className="search-recents-list">
+              {recentSearches.map((query) => (
+                <button
+                  key={query}
+                  className="search-recent-chip"
+                  onClick={() => onSelectRecent?.(query)}
+                  type="button"
+                >
+                  {query}
+                </button>
+              ))}
+            </div>
+          </div>
+        )}
       </div>
     </div>
   );

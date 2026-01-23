@@ -14,6 +14,10 @@ import {
   Stats,
 } from './api/client';
 
+const MATCH_ALL_QUERY = '__cc_match_all__';
+const RECENT_STORAGE_KEY = 'central-chat.recent-searches';
+const MAX_RECENT = 6;
+
 function formatLastImported(dateStr: string | null): string {
   if (!dateStr) return '';
   try {
@@ -40,8 +44,97 @@ function isEditableTarget(target: EventTarget | null): boolean {
   return tag === 'input' || tag === 'textarea' || target.isContentEditable;
 }
 
+function normalizeRole(value: string): string {
+  const normalized = value.toLowerCase();
+  if (['me', 'user'].includes(normalized)) return 'user';
+  if (['assistant', 'bot', 'ai'].includes(normalized)) return 'assistant';
+  if (['system', 'tool'].includes(normalized)) return normalized;
+  return value;
+}
+
+function parseSearchInput(input: string): {
+  text: string;
+  platform?: string;
+  role?: string;
+  before?: string;
+} {
+  const tokens = input.trim().split(/\s+/).filter(Boolean);
+  const textParts: string[] = [];
+  let platform: string | undefined;
+  let role: string | undefined;
+  let before: string | undefined;
+
+  for (const token of tokens) {
+    const match = token.match(/^(\w+):(.*)$/);
+    if (!match || match[2] === '') {
+      textParts.push(token);
+      continue;
+    }
+
+    const key = match[1].toLowerCase();
+    const value = match[2];
+
+    if (key === 'platform') {
+      platform = value.toLowerCase();
+      continue;
+    }
+    if (key === 'role' || key === 'from') {
+      role = normalizeRole(value);
+      continue;
+    }
+    if (key === 'before') {
+      before = value;
+      continue;
+    }
+
+    textParts.push(token);
+  }
+
+  return {
+    text: textParts.join(' ').trim(),
+    platform,
+    role,
+    before,
+  };
+}
+
+function buildSearchSuggestions(input: string): string[] {
+  const { text, platform, role } = parseSearchInput(input);
+  const base = text.trim();
+  const suggestions: string[] = [];
+
+  const addSuggestion = (value: string) => {
+    const trimmed = value.trim();
+    if (!trimmed) return;
+    if (!suggestions.includes(trimmed)) suggestions.push(trimmed);
+  };
+
+  if (base && base !== input.trim()) {
+    addSuggestion(base);
+  }
+
+  if (!platform) {
+    ['openai', 'claude', 'raycast'].forEach((p) => {
+      addSuggestion(`platform:${p} ${base}`.trim());
+    });
+  }
+
+  if (!role) {
+    ['user', 'assistant'].forEach((r) => {
+      addSuggestion(`role:${r} ${base}`.trim());
+    });
+  }
+
+  if (!base) {
+    addSuggestion('before:2024-01-01');
+  }
+
+  return suggestions.slice(0, 5);
+}
+
 function App() {
   const [query, setQuery] = useState('');
+  const [searchInput, setSearchInput] = useState('');
   const [results, setResults] = useState<SearchResult[]>([]);
   const [conversations, setConversations] = useState<Conversation[]>([]);
   const [selectedConversation, setSelectedConversation] = useState<Conversation | null>(null);
@@ -50,11 +143,37 @@ function App() {
   const [platform, setPlatform] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
   const [showImport, setShowImport] = useState(false);
+  const [recentSearches, setRecentSearches] = useState<string[]>([]);
+  const [showHelp, setShowHelp] = useState(false);
+  const isMac = typeof navigator !== 'undefined' && /Mac|iPod|iPhone|iPad/.test(navigator.platform);
 
   // Load stats on mount
   useEffect(() => {
     getStats().then(setStats).catch(console.error);
   }, []);
+
+  useEffect(() => {
+    try {
+      const stored = localStorage.getItem(RECENT_STORAGE_KEY);
+      if (stored) {
+        const parsed = JSON.parse(stored);
+        if (Array.isArray(parsed)) {
+          setRecentSearches(parsed.filter((item) => typeof item === 'string'));
+        }
+      }
+    } catch {
+      setRecentSearches([]);
+    }
+  }, []);
+
+  useEffect(() => {
+    if (!showHelp) return;
+    const previous = document.body.style.overflow;
+    document.body.style.overflow = 'hidden';
+    return () => {
+      document.body.style.overflow = previous;
+    };
+  }, [showHelp]);
 
   // Load conversation from URL on mount
   useEffect(() => {
@@ -112,6 +231,25 @@ function App() {
     }
   }, [items.length, selectedIndex]);
 
+  const updateRecentSearches = useCallback((value: string) => {
+    const trimmed = value.trim();
+    if (!trimmed) return;
+
+    setRecentSearches((prev) => {
+      const next = [
+        trimmed,
+        ...prev.filter((item) => item.toLowerCase() !== trimmed.toLowerCase()),
+      ];
+      const limited = next.slice(0, MAX_RECENT);
+      try {
+        localStorage.setItem(RECENT_STORAGE_KEY, JSON.stringify(limited));
+      } catch {
+        // Ignore storage failures
+      }
+      return limited;
+    });
+  }, []);
+
   // Search with debounce
   const handleSearch = useCallback(async (q: string) => {
     setQuery(q);
@@ -122,14 +260,29 @@ function App() {
 
     setLoading(true);
     try {
-      const response = await search(q, { platform: platform || undefined, limit: 100 });
+      const { text, platform: inlinePlatform, role, before } = parseSearchInput(q);
+      const response = await search(text || MATCH_ALL_QUERY, {
+        platform: inlinePlatform || platform || undefined,
+        role: role || undefined,
+        before: before || undefined,
+        limit: 100,
+      });
       setResults(response.results);
+      updateRecentSearches(q);
     } catch (error) {
       console.error('Search error:', error);
     } finally {
       setLoading(false);
     }
-  }, [platform]);
+  }, [platform, updateRecentSearches]);
+
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      handleSearch(searchInput);
+    }, 300);
+
+    return () => clearTimeout(timer);
+  }, [searchInput, handleSearch]);
 
   // Load full conversation when selected
   const handleSelectConversation = useCallback(async (conversationId: string) => {
@@ -149,8 +302,29 @@ function App() {
     handleSelectConversation(conversationId);
   }, [handleSelectConversation]);
 
+  const handleSelectRecent = useCallback((value: string) => {
+    setSearchInput(value);
+  }, []);
+
+  const handleSelectSuggestion = useCallback((value: string) => {
+    setSearchInput(value);
+  }, []);
+
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
+      if (showHelp && e.key === 'Escape') {
+        e.preventDefault();
+        setShowHelp(false);
+        return;
+      }
+
+      if ((e.key === '?' || (e.key === '/' && e.shiftKey)) && !isEditableTarget(e.target)) {
+        e.preventDefault();
+        setShowHelp(true);
+        return;
+      }
+
+      if (showHelp) return;
       if (isEditableTarget(e.target)) return;
       if (items.length === 0) return;
 
@@ -187,7 +361,7 @@ function App() {
 
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [items, isSearchMode, selectedIndex, handleSelectConversation]);
+  }, [items, isSearchMode, selectedIndex, handleSelectConversation, showHelp]);
 
   // Refresh after import
   const handleImportComplete = () => {
@@ -228,7 +402,106 @@ function App() {
         <ImportPanel onImportComplete={handleImportComplete} />
       )}
 
-      <SearchBar onSearch={handleSearch} loading={loading && !!query} />
+      {showHelp && (
+        <div className="help-overlay" onClick={() => setShowHelp(false)}>
+          <div
+            className="help-modal"
+            onClick={(event) => event.stopPropagation()}
+            role="dialog"
+            aria-modal="true"
+            aria-label="Keyboard shortcuts and search operators"
+          >
+            <div className="help-header">
+              <div>
+                <h2>Search Help</h2>
+                <p>Operators and keyboard shortcuts</p>
+              </div>
+              <button
+                className="help-close"
+                onClick={() => setShowHelp(false)}
+                type="button"
+                aria-label="Close help"
+              >
+                Esc
+              </button>
+            </div>
+
+            <div className="help-section">
+              <h3>Search Operators</h3>
+              <div className="help-list">
+                <div className="help-item">
+                  <code>platform:openai</code>
+                  <span>Filter by platform (openai, claude, raycast)</span>
+                </div>
+                <div className="help-item">
+                  <code>role:user</code>
+                  <span>Filter by message role (user, assistant, system)</span>
+                </div>
+                <div className="help-item">
+                  <code>from:assistant</code>
+                  <span>Alias for role filter</span>
+                </div>
+                <div className="help-item">
+                  <code>before:2024-01-01</code>
+                  <span>Only show results before a date</span>
+                </div>
+              </div>
+            </div>
+
+            <div className="help-section">
+              <h3>Keyboard Shortcuts</h3>
+              <div className="help-list">
+                <div className="help-item">
+                  <div className="help-keys">
+                    <kbd>{isMac ? 'Cmd' : 'Ctrl'}</kbd>
+                    <kbd>K</kbd>
+                  </div>
+                  <span>Focus search</span>
+                </div>
+                <div className="help-item">
+                  <div className="help-keys">
+                    <kbd>/</kbd>
+                  </div>
+                  <span>Focus search</span>
+                </div>
+                <div className="help-item">
+                  <div className="help-keys">
+                    <kbd>?</kbd>
+                  </div>
+                  <span>Open this help</span>
+                </div>
+                <div className="help-item">
+                  <div className="help-keys">
+                    <kbd>Esc</kbd>
+                  </div>
+                  <span>Clear selection, clear search, or close help</span>
+                </div>
+                <div className="help-item">
+                  <div className="help-keys">
+                    <kbd>↑</kbd>
+                    <kbd>↓</kbd>
+                  </div>
+                  <span>Navigate results</span>
+                </div>
+                <div className="help-item">
+                  <div className="help-keys">
+                    <kbd>Enter</kbd>
+                  </div>
+                  <span>Open selected result</span>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      <SearchBar
+        value={searchInput}
+        onChange={setSearchInput}
+        loading={loading && !!query}
+        recentSearches={recentSearches}
+        onSelectRecent={handleSelectRecent}
+      />
 
       <Filters
         stats={stats}
@@ -245,6 +518,8 @@ function App() {
           selectedIndex={selectedIndex}
           onSelect={handleSelectFromList}
           isSearchMode={isSearchMode}
+          suggestions={buildSearchSuggestions(query)}
+          onSuggestionSelect={handleSelectSuggestion}
         />
 
         <MessageViewer conversation={selectedConversation} />
