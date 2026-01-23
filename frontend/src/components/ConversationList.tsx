@@ -7,7 +7,8 @@ interface ConversationListProps {
   conversations: Conversation[];
   loading: boolean;
   selectedId?: string;
-  onSelect: (id: string) => void;
+  selectedIndex?: number | null;
+  onSelect: (id: string, index: number) => void;
   isSearchMode: boolean;
 }
 
@@ -122,6 +123,7 @@ function ConversationList({
   conversations,
   loading,
   selectedId,
+  selectedIndex,
   onSelect,
   isSearchMode,
 }: ConversationListProps) {
@@ -157,6 +159,19 @@ function ConversationList({
     }, [isSearchMode, results]),
     overscan: 5,
   });
+
+  useEffect(() => {
+    if (
+      selectedIndex === null ||
+      selectedIndex === undefined ||
+      selectedIndex < 0 ||
+      selectedIndex >= items.length
+    ) {
+      return;
+    }
+
+    virtualizer.scrollToIndex(selectedIndex, { align: 'auto' });
+  }, [selectedIndex, items.length, virtualizer]);
 
   // Mark item as animated
   const markAnimated = useCallback((key: string) => {
@@ -211,6 +226,9 @@ function ConversationList({
               const key = getItemKey(result, virtualRow.index);
               const isAnimated = animatedItems.has(key);
               const shouldAnimate = !isAnimated && virtualRow.index < 20;
+              const isSelected = selectedIndex !== null && selectedIndex !== undefined
+                ? selectedIndex === virtualRow.index
+                : selectedId === result.conversation_id;
 
               if (shouldAnimate) {
                 // Schedule animation mark after render
@@ -220,7 +238,7 @@ function ConversationList({
               return (
                 <div
                   key={key}
-                  className={`result-item ${selectedId === result.conversation_id ? `selected ${result.platform}` : ''} ${shouldAnimate ? 'animate-in' : ''}`}
+                  className={`result-item ${isSelected ? `selected ${result.platform}` : ''} ${shouldAnimate ? 'animate-in' : ''}`}
                   style={{
                     position: 'absolute',
                     top: 0,
@@ -230,7 +248,7 @@ function ConversationList({
                     transform: `translateY(${virtualRow.start}px)`,
                     animationDelay: shouldAnimate ? `${virtualRow.index * 30}ms` : undefined,
                   }}
-                  onClick={() => onSelect(result.conversation_id)}
+                  onClick={() => onSelect(result.conversation_id, virtualRow.index)}
                 >
                   <div className="result-title">
                     <PlatformBadge platform={result.platform} />
@@ -281,6 +299,9 @@ function ConversationList({
             const key = getItemKey(conv, virtualRow.index);
             const isAnimated = animatedItems.has(key);
             const shouldAnimate = !isAnimated && virtualRow.index < 20;
+            const isSelected = selectedIndex !== null && selectedIndex !== undefined
+              ? selectedIndex === virtualRow.index
+              : selectedId === conv.id;
 
             if (shouldAnimate) {
               requestAnimationFrame(() => markAnimated(key));
@@ -289,7 +310,7 @@ function ConversationList({
             return (
               <div
                 key={conv.id}
-                className={`result-item ${selectedId === conv.id ? `selected ${conv.platform}` : ''} ${shouldAnimate ? 'animate-in' : ''}`}
+                className={`result-item ${isSelected ? `selected ${conv.platform}` : ''} ${shouldAnimate ? 'animate-in' : ''}`}
                 style={{
                   position: 'absolute',
                   top: 0,
@@ -299,7 +320,7 @@ function ConversationList({
                   transform: `translateY(${virtualRow.start}px)`,
                   animationDelay: shouldAnimate ? `${virtualRow.index * 30}ms` : undefined,
                 }}
-                onClick={() => onSelect(conv.id)}
+                onClick={() => onSelect(conv.id, virtualRow.index)}
               >
                 <div className="result-title">
                   <PlatformBadge platform={conv.platform} />

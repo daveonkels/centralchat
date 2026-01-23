@@ -52,7 +52,15 @@ function SearchBar({ onSearch, loading = false }: SearchBarProps) {
   // Keyboard shortcut: Cmd+K or Ctrl+K to focus search
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
+      const target = e.target as HTMLElement | null;
+      const tagName = target?.tagName?.toLowerCase();
+      const isEditable = tagName === 'input' || tagName === 'textarea' || target?.isContentEditable;
+
       if ((e.metaKey || e.ctrlKey) && e.key === 'k') {
+        e.preventDefault();
+        inputRef.current?.focus();
+      }
+      if (e.key === '/' && !isEditable) {
         e.preventDefault();
         inputRef.current?.focus();
       }

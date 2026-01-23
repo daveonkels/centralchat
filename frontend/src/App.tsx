@@ -34,11 +34,18 @@ function getConversationIdFromUrl(): string | null {
   return match ? decodeURIComponent(match[1]) : null;
 }
 
+function isEditableTarget(target: EventTarget | null): boolean {
+  if (!target || !(target instanceof HTMLElement)) return false;
+  const tag = target.tagName.toLowerCase();
+  return tag === 'input' || tag === 'textarea' || target.isContentEditable;
+}
+
 function App() {
   const [query, setQuery] = useState('');
   const [results, setResults] = useState<SearchResult[]>([]);
   const [conversations, setConversations] = useState<Conversation[]>([]);
   const [selectedConversation, setSelectedConversation] = useState<Conversation | null>(null);
+  const [selectedIndex, setSelectedIndex] = useState<number | null>(null);
   const [stats, setStats] = useState<Stats | null>(null);
   const [platform, setPlatform] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
@@ -87,6 +94,24 @@ function App() {
     }
   }, [platform, query]);
 
+  useEffect(() => {
+    setSelectedIndex(null);
+  }, [query, platform]);
+
+  const isSearchMode = !!query;
+  const items = isSearchMode ? results : conversations;
+
+  useEffect(() => {
+    if (items.length === 0) {
+      if (selectedIndex !== null) setSelectedIndex(null);
+      return;
+    }
+
+    if (selectedIndex !== null && selectedIndex >= items.length) {
+      setSelectedIndex(items.length - 1);
+    }
+  }, [items.length, selectedIndex]);
+
   // Search with debounce
   const handleSearch = useCallback(async (q: string) => {
     setQuery(q);
@@ -107,7 +132,7 @@ function App() {
   }, [platform]);
 
   // Load full conversation when selected
-  const handleSelectConversation = async (conversationId: string) => {
+  const handleSelectConversation = useCallback(async (conversationId: string) => {
     try {
       const conv = await getConversation(conversationId);
       setSelectedConversation(conv);
@@ -117,7 +142,52 @@ function App() {
     } catch (error) {
       console.error('Failed to load conversation:', error);
     }
-  };
+  }, []);
+
+  const handleSelectFromList = useCallback((conversationId: string, index: number) => {
+    setSelectedIndex(index);
+    handleSelectConversation(conversationId);
+  }, [handleSelectConversation]);
+
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (isEditableTarget(e.target)) return;
+      if (items.length === 0) return;
+
+      if (e.key === 'ArrowDown' || e.key === 'ArrowUp') {
+        e.preventDefault();
+        setSelectedIndex((prev) => {
+          if (prev === null) {
+            return e.key === 'ArrowDown' ? 0 : items.length - 1;
+          }
+          const delta = e.key === 'ArrowDown' ? 1 : -1;
+          const next = Math.min(Math.max(prev + delta, 0), items.length - 1);
+          return next;
+        });
+        return;
+      }
+
+      if (e.key === 'Enter') {
+        if (selectedIndex === null) return;
+        const item = items[selectedIndex];
+        if (!item) return;
+        const conversationId = isSearchMode
+          ? (item as SearchResult).conversation_id
+          : (item as Conversation).id;
+        if (conversationId) {
+          handleSelectConversation(conversationId);
+        }
+        return;
+      }
+
+      if (e.key === 'Escape') {
+        setSelectedIndex(null);
+      }
+    };
+
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [items, isSearchMode, selectedIndex, handleSelectConversation]);
 
   // Refresh after import
   const handleImportComplete = () => {
@@ -172,8 +242,9 @@ function App() {
           conversations={query ? [] : conversations}
           loading={loading}
           selectedId={selectedConversation?.id}
-          onSelect={handleSelectConversation}
-          isSearchMode={!!query}
+          selectedIndex={selectedIndex}
+          onSelect={handleSelectFromList}
+          isSearchMode={isSearchMode}
         />
 
         <MessageViewer conversation={selectedConversation} />
