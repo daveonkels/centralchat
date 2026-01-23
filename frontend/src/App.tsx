@@ -58,6 +58,7 @@ function App() {
   const [showImport, setShowImport] = useState(false);
   const [recentSearches, setRecentSearches] = useState<string[]>([]);
   const [showHelp, setShowHelp] = useState(false);
+  const [searchError, setSearchError] = useState<string | null>(null);
   const isMac = typeof navigator !== 'undefined' && /Mac|iPod|iPhone|iPad/.test(navigator.platform);
 
   // Load stats on mount
@@ -167,6 +168,7 @@ function App() {
   const handleSearch = useCallback(async (q: string) => {
     setQuery(q);
     if (!q.trim()) {
+      setSearchError(null);
       setResults([]);
       return;
     }
@@ -181,8 +183,11 @@ function App() {
         limit: 100,
       });
       setResults(response.results);
+      setSearchError(null);
       updateRecentSearches(q);
     } catch (error) {
+      setResults([]);
+      setSearchError(error instanceof Error ? error.message : 'Search failed');
       console.error('Search error:', error);
     } finally {
       setLoading(false);
@@ -414,6 +419,8 @@ function App() {
         loading={loading && !!query}
         recentSearches={recentSearches}
         onSelectRecent={handleSelectRecent}
+        error={searchError}
+        onToggleHelp={() => setShowHelp(true)}
       />
 
       <Filters

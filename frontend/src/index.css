@@ -375,6 +375,28 @@ header h1 {
   border-color: var(--border-strong);
 }
 
+.search-help-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 24px;
+  height: 24px;
+  background: var(--bg-elevated);
+  border: 1px solid var(--border-default);
+  border-radius: var(--radius-sm);
+  color: var(--text-muted);
+  cursor: pointer;
+  transition: all var(--transition-fast);
+  font-family: var(--font-mono);
+  font-size: 12px;
+}
+
+.search-help-btn:hover {
+  background: var(--bg-hover);
+  color: var(--text-primary);
+  border-color: var(--border-strong);
+}
+
 .search-shortcut {
   display: flex;
   gap: 2px;
@@ -467,6 +489,11 @@ header h1 {
   background: var(--bg-tertiary);
   border-color: var(--border-strong);
   color: var(--text-primary);
+}
+
+.search-error {
+  font-size: var(--text-xs);
+  color: var(--error);
 }
 
 /* =============================================================================
@@ -1253,6 +1280,38 @@ header h1 {
   max-width: 280px;
 }
 
+.empty-steps {
+  margin-top: var(--space-4);
+  background: var(--bg-elevated);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-md);
+  padding: var(--space-4);
+  text-align: left;
+  color: var(--text-secondary);
+  font-size: var(--text-sm);
+}
+
+.empty-steps-title {
+  font-size: var(--text-xs);
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+  color: var(--text-muted);
+  margin-bottom: var(--space-2);
+}
+
+.empty-steps ol {
+  margin: 0;
+  padding-left: 1.2em;
+  display: grid;
+  gap: var(--space-2);
+}
+
+.empty-steps-files {
+  margin-top: var(--space-3);
+  font-size: var(--text-xs);
+  color: var(--text-muted);
+}
+
 .search-suggestions {
   margin-top: var(--space-4);
   display: flex;
@@ -1472,6 +1531,60 @@ header h1 {
   box-shadow: none;
 }
 
+.import-note {
+  font-size: var(--text-xs);
+  color: var(--text-muted);
+  margin-bottom: var(--space-3);
+}
+
+.export-guides {
+  margin-bottom: var(--space-4);
+  display: grid;
+  gap: var(--space-3);
+}
+
+.export-guides-title {
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+  font-size: 10px;
+  color: var(--text-muted);
+}
+
+.export-guides-list {
+  display: grid;
+  gap: var(--space-3);
+}
+
+.export-guide-card {
+  background: var(--bg-secondary);
+  border: 1px solid var(--border-default);
+  border-radius: var(--radius-md);
+  padding: var(--space-3);
+  display: grid;
+  gap: var(--space-2);
+  font-size: var(--text-sm);
+  color: var(--text-secondary);
+}
+
+.export-guide-card a {
+  color: var(--accent);
+  text-decoration: none;
+  font-size: var(--text-xs);
+}
+
+.export-guide-card a:hover {
+  text-decoration: underline;
+}
+
+.export-guide-file {
+  font-size: var(--text-xs);
+  color: var(--text-muted);
+}
+
+.import-count-new {
+  text-decoration: underline dotted;
+  cursor: help;
+}
 .import-actions {
   display: flex;
   align-items: center;

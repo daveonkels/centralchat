@@ -109,6 +109,48 @@ function ImportPanel({ onImportComplete }: ImportPanelProps) {
   return (
     <div className="import-section">
       <h3 style={{ marginBottom: '12px' }}>Import Exports</h3>
+      <p className="import-note">
+        Data stays local in <code>data/central-chat.db</code>. "New" counts only previously imported conversations.
+      </p>
+
+      <div className="export-guides">
+        <div className="export-guides-title">Export guides</div>
+        <div className="export-guides-list">
+          <div className="export-guide-card">
+            <span className="platform-badge openai">ChatGPT</span>
+            <span className="export-guide-file">Expected: <code>conversations.json</code></span>
+            <a
+              href="https://help.openai.com/en/articles/7260999-how-do-i-export-my-chatgpt-history"
+              target="_blank"
+              rel="noreferrer"
+            >
+              Learn how to export
+            </a>
+          </div>
+          <div className="export-guide-card">
+            <span className="platform-badge claude">Claude</span>
+            <span className="export-guide-file">Expected: <code>conversations.json</code></span>
+            <a
+              href="https://support.anthropic.com/en/articles/8325615-how-do-i-export-my-data-from-claude"
+              target="_blank"
+              rel="noreferrer"
+            >
+              Learn how to export
+            </a>
+          </div>
+          <div className="export-guide-card">
+            <span className="platform-badge raycast">Raycast</span>
+            <span className="export-guide-file">Expected: <code>raycast_ai_chats.json</code></span>
+            <a
+              href="https://www.raycast.com/manual/exporting-data"
+              target="_blank"
+              rel="noreferrer"
+            >
+              Learn how to export
+            </a>
+          </div>
+        </div>
+      </div>
 
       {exports.length === 0 ? (
         <p style={{ color: 'var(--text-secondary)' }}>
@@ -174,7 +216,14 @@ function ImportPanel({ onImportComplete }: ImportPanelProps) {
             >
               <strong>{result.platform}</strong> ({formatSourceName(result.source_path)}): {result.status}
               {result.status !== 'error' && (
-                <> - {result.conversations_found} found, {result.conversations_imported} new, {result.messages_imported} messages</>
+                <>
+                  {' '}
+                  - {result.conversations_found} found, {result.conversations_imported}{' '}
+                  <span className="import-count-new" title="New conversations not previously imported">
+                    new
+                  </span>
+                  , {result.messages_imported} messages
+                </>
               )}
               {result.errors.length > 0 && (
                 <ul>

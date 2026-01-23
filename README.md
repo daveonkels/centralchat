@@ -154,6 +154,14 @@ curl -X POST https://central-chat.example.com/api/import/run
 - Type in the search box to search across all messages and conversation titles
 - Use platform filters to narrow results
 - Click on a result to view the full conversation
+- Search operators:
+  - `platform:openai`, `platform:claude`, `platform:raycast`
+  - `role:user`, `role:assistant`, `from:assistant`
+  - `before:YYYY-MM-DD`
+
+### Data Storage
+
+- Database is stored locally at `data/central-chat.db`
 
 ## Project Structure
 

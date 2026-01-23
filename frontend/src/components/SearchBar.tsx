@@ -6,6 +6,8 @@ interface SearchBarProps {
   loading?: boolean;
   recentSearches?: string[];
   onSelectRecent?: (query: string) => void;
+  error?: string | null;
+  onToggleHelp?: () => void;
 }
 
 // Search icon SVG
@@ -45,6 +47,8 @@ function SearchBar({
   loading = false,
   recentSearches = [],
   onSelectRecent,
+  error,
+  onToggleHelp,
 }: SearchBarProps) {
   const inputRef = useRef<HTMLInputElement>(null);
 
@@ -114,6 +118,17 @@ function SearchBar({
               <kbd>K</kbd>
             </div>
           )}
+          {onToggleHelp && (
+            <button
+              className="search-help-btn"
+              onClick={onToggleHelp}
+              type="button"
+              aria-label="Show search help"
+              title="Show search help (?)"
+            >
+              ?
+            </button>
+          )}
         </div>
       </div>
 
@@ -141,6 +156,12 @@ function SearchBar({
                 </button>
               ))}
             </div>
+          </div>
+        )}
+
+        {error && (
+          <div className="search-error" role="alert">
+            {error}
           </div>
         )}
       </div>

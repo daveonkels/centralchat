@@ -102,7 +102,16 @@ export async function search(
   if (options.offset) params.set('offset', options.offset.toString());
 
   const res = await fetch(`${API_BASE}/search?${params}`);
-  if (!res.ok) throw new Error('Search failed');
+  if (!res.ok) {
+    let message = 'Search failed';
+    try {
+      const data = await res.json();
+      if (data?.detail) message = data.detail;
+    } catch {
+      // Ignore parse errors.
+    }
+    throw new Error(message);
+  }
   return res.json();
 }
 

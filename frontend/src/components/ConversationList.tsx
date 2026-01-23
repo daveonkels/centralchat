@@ -300,6 +300,17 @@ function ConversationList({
           <ConversationEmptyIcon />
           <h3>No conversations yet</h3>
           <p>Import your chat exports to get started</p>
+          <div className="empty-steps">
+            <div className="empty-steps-title">Get started</div>
+            <ol>
+              <li>Export chats from ChatGPT, Claude, or Raycast.</li>
+              <li>Drop export folders into <code>imports/</code>.</li>
+              <li>Click Import to index and search.</li>
+            </ol>
+            <div className="empty-steps-files">
+              Expected files: <code>conversations.json</code>, <code>raycast_ai_chats.json</code>
+            </div>
+          </div>
         </div>
       </div>
     );
