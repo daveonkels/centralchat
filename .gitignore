@@ -47,3 +47,6 @@ imports/*/
 .coverage
 htmlcov/
 .pytest_cache/
+
+# Deployment docs (server-specific, not for repo)
+DEPLOYMENT.md
