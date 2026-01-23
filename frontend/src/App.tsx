@@ -13,6 +13,7 @@ import {
   Conversation,
   Stats,
 } from './api/client';
+import { parseSearchInput, buildSearchSuggestions } from './utils/search';
 
 const MATCH_ALL_QUERY = '__cc_match_all__';
 const RECENT_STORAGE_KEY = 'central-chat.recent-searches';
@@ -42,94 +43,6 @@ function isEditableTarget(target: EventTarget | null): boolean {
   if (!target || !(target instanceof HTMLElement)) return false;
   const tag = target.tagName.toLowerCase();
   return tag === 'input' || tag === 'textarea' || target.isContentEditable;
-}
-
-function normalizeRole(value: string): string {
-  const normalized = value.toLowerCase();
-  if (['me', 'user'].includes(normalized)) return 'user';
-  if (['assistant', 'bot', 'ai'].includes(normalized)) return 'assistant';
-  if (['system', 'tool'].includes(normalized)) return normalized;
-  return value;
-}
-
-function parseSearchInput(input: string): {
-  text: string;
-  platform?: string;
-  role?: string;
-  before?: string;
-} {
-  const tokens = input.trim().split(/\s+/).filter(Boolean);
-  const textParts: string[] = [];
-  let platform: string | undefined;
-  let role: string | undefined;
-  let before: string | undefined;
-
-  for (const token of tokens) {
-    const match = token.match(/^(\w+):(.*)$/);
-    if (!match || match[2] === '') {
-      textParts.push(token);
-      continue;
-    }
-
-    const key = match[1].toLowerCase();
-    const value = match[2];
-
-    if (key === 'platform') {
-      platform = value.toLowerCase();
-      continue;
-    }
-    if (key === 'role' || key === 'from') {
-      role = normalizeRole(value);
-      continue;
-    }
-    if (key === 'before') {
-      before = value;
-      continue;
-    }
-
-    textParts.push(token);
-  }
-
-  return {
-    text: textParts.join(' ').trim(),
-    platform,
-    role,
-    before,
-  };
-}
-
-function buildSearchSuggestions(input: string): string[] {
-  const { text, platform, role } = parseSearchInput(input);
-  const base = text.trim();
-  const suggestions: string[] = [];
-
-  const addSuggestion = (value: string) => {
-    const trimmed = value.trim();
-    if (!trimmed) return;
-    if (!suggestions.includes(trimmed)) suggestions.push(trimmed);
-  };
-
-  if (base && base !== input.trim()) {
-    addSuggestion(base);
-  }
-
-  if (!platform) {
-    ['openai', 'claude', 'raycast'].forEach((p) => {
-      addSuggestion(`platform:${p} ${base}`.trim());
-    });
-  }
-
-  if (!role) {
-    ['user', 'assistant'].forEach((r) => {
-      addSuggestion(`role:${r} ${base}`.trim());
-    });
-  }
-
-  if (!base) {
-    addSuggestion('before:2024-01-01');
-  }
-
-  return suggestions.slice(0, 5);
 }
 
 function App() {
