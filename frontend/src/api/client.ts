@@ -77,6 +77,13 @@ export interface ImportStatus {
   errors: string[];
 }
 
+export interface ImportJobResponse {
+  job_id: string;
+  statuses: ImportStatus[];
+  completed: boolean;
+  canceled: boolean;
+}
+
 export interface DetectedExport {
   path: string;
   name: string;
@@ -129,8 +136,20 @@ export async function scanImports(): Promise<{ detected_exports: DetectedExport[
   return res.json();
 }
 
-export async function runImport(): Promise<ImportStatus[]> {
+export async function runImport(): Promise<ImportJobResponse> {
   const res = await fetch(`${API_BASE}/import/run`, { method: 'POST' });
   if (!res.ok) throw new Error('Import failed');
+  return res.json();
+}
+
+export async function getImportStatus(jobId: string): Promise<ImportJobResponse> {
+  const res = await fetch(`${API_BASE}/import/status/${jobId}`);
+  if (!res.ok) throw new Error('Failed to get import status');
+  return res.json();
+}
+
+export async function cancelImport(jobId: string): Promise<ImportJobResponse> {
+  const res = await fetch(`${API_BASE}/import/cancel/${jobId}`, { method: 'POST' });
+  if (!res.ok) throw new Error('Failed to cancel import');
   return res.json();
 }

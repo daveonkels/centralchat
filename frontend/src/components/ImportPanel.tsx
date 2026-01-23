@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { scanImports, runImport, DetectedExport, ImportStatus } from '../api/client';
+import { scanImports, runImport, getImportStatus, cancelImport, DetectedExport, ImportStatus } from '../api/client';
 
 interface ImportPanelProps {
   onImportComplete: () => void;
@@ -10,6 +10,10 @@ function ImportPanel({ onImportComplete }: ImportPanelProps) {
   const [importing, setImporting] = useState(false);
   const [results, setResults] = useState<ImportStatus[]>([]);
   const [error, setError] = useState<string | null>(null);
+  const [jobId, setJobId] = useState<string | null>(null);
+  const [jobCompleted, setJobCompleted] = useState(false);
+  const [jobCanceled, setJobCanceled] = useState(false);
+  const [canceling, setCanceling] = useState(false);
 
   useEffect(() => {
     scanImports()
@@ -21,17 +25,86 @@ function ImportPanel({ onImportComplete }: ImportPanelProps) {
     setImporting(true);
     setError(null);
     setResults([]);
+    setJobId(null);
+    setJobCompleted(false);
+    setJobCanceled(false);
+    setCanceling(false);
 
     try {
-      const importResults = await runImport();
-      setResults(importResults);
-      onImportComplete();
+      const response = await runImport();
+      setResults(response.statuses);
+      setJobId(response.job_id);
+      setJobCompleted(response.completed);
+      setJobCanceled(response.canceled);
+      if (response.completed) {
+        setImporting(false);
+        onImportComplete();
+      }
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Import failed');
-    } finally {
       setImporting(false);
     }
   };
+
+  useEffect(() => {
+    if (!jobId || !importing) return;
+
+    const poll = async () => {
+      try {
+        const status = await getImportStatus(jobId);
+        setResults(status.statuses);
+        setJobCompleted(status.completed);
+        setJobCanceled(status.canceled);
+        if (status.completed) {
+          setImporting(false);
+          onImportComplete();
+        }
+      } catch (err) {
+        setError(err instanceof Error ? err.message : 'Failed to refresh import status');
+        setImporting(false);
+      }
+    };
+
+    const interval = setInterval(poll, 1000);
+    poll();
+
+    return () => clearInterval(interval);
+  }, [jobId, importing, onImportComplete]);
+
+  const handleCancel = async () => {
+    if (!jobId || canceling) return;
+    setCanceling(true);
+    setError(null);
+    try {
+      const status = await cancelImport(jobId);
+      setResults(status.statuses);
+      setJobCompleted(status.completed);
+      setJobCanceled(status.canceled);
+      if (status.completed) {
+        setImporting(false);
+        onImportComplete();
+      }
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Failed to cancel import');
+    } finally {
+      setCanceling(false);
+    }
+  };
+
+  const formatSourceName = (sourcePath: string) => {
+    const parts = sourcePath.split('/').filter(Boolean);
+    return parts[parts.length - 1] || sourcePath;
+  };
+
+  const totalJobs = results.length;
+  const completedJobs = results.filter((r) => ['completed', 'error', 'canceled'].includes(r.status)).length;
+  const runningJobs = results.filter((r) => r.status === 'running').length;
+  const estimatedUnits = Math.min(completedJobs + runningJobs * 0.5, totalJobs);
+  const estimatedPercent = totalJobs > 0 ? Math.round((estimatedUnits / totalJobs) * 100) : 0;
+  const displayPercent = jobCompleted ? 100 : estimatedPercent;
+  const progressLabel = jobCanceled
+    ? (jobCompleted ? 'Canceled' : 'Canceling')
+    : (jobCompleted ? 'Completed' : 'Estimated progress');
 
   return (
     <div className="import-section">
@@ -55,13 +128,25 @@ function ImportPanel({ onImportComplete }: ImportPanelProps) {
             ))}
           </ul>
 
-          <button
-            className="import-btn"
-            onClick={handleImport}
-            disabled={importing}
-          >
-            {importing ? 'Importing...' : 'Run Import'}
-          </button>
+          <div className="import-actions">
+            <button
+              className="import-btn"
+              onClick={handleImport}
+              disabled={importing}
+            >
+              {importing ? 'Importing...' : 'Run Import'}
+            </button>
+            {importing && jobId && (
+              <button
+                className="import-cancel"
+                onClick={handleCancel}
+                disabled={canceling}
+                type="button"
+              >
+                {canceling ? 'Canceling...' : 'Cancel'}
+              </button>
+            )}
+          </div>
         </>
       )}
 
@@ -71,16 +156,25 @@ function ImportPanel({ onImportComplete }: ImportPanelProps) {
         </div>
       )}
 
+      {totalJobs > 0 && (
+        <div className="import-progress">
+          <progress max={100} value={displayPercent} />
+          <span>
+            {progressLabel}: {displayPercent}%
+          </span>
+        </div>
+      )}
+
       {results.length > 0 && (
         <div style={{ marginTop: '16px' }}>
           {results.map((result, idx) => (
             <div
               key={idx}
-              className={`import-status ${result.status === 'completed' ? 'success' : 'error'}`}
+              className={`import-status ${result.status === 'completed' ? 'success' : result.status === 'error' ? 'error' : result.status === 'canceled' ? 'canceled' : ''}`}
             >
-              <strong>{result.platform}</strong>: {result.status}
-              {result.status === 'completed' && (
-                <> - {result.conversations_imported} conversations, {result.messages_imported} messages imported</>
+              <strong>{result.platform}</strong> ({formatSourceName(result.source_path)}): {result.status}
+              {result.status !== 'error' && (
+                <> - {result.conversations_found} found, {result.conversations_imported} new, {result.messages_imported} messages</>
               )}
               {result.errors.length > 0 && (
                 <ul>

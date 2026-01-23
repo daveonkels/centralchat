@@ -1,4 +1,4 @@
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 from typing import Optional
 from datetime import datetime
 
@@ -71,12 +71,19 @@ class ImportStatus(BaseModel):
     conversations_found: int = 0
     conversations_imported: int = 0
     messages_imported: int = 0
-    errors: list[str] = []
+    errors: list[str] = Field(default_factory=list)
 
 
 class ImportScanResult(BaseModel):
     detected_exports: list[dict]
     total_folders: int
+
+
+class ImportJobResponse(BaseModel):
+    job_id: str
+    statuses: list[ImportStatus]
+    completed: bool = False
+    canceled: bool = False
 
 
 class StatsResponse(BaseModel):

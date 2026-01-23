@@ -1,7 +1,10 @@
-from fastapi import APIRouter, BackgroundTasks
+from fastapi import APIRouter, BackgroundTasks, HTTPException
 from pathlib import Path
-from datetime import datetime
+from datetime import datetime, timedelta
 import os
+import threading
+import uuid
+from typing import Callable
 
 from ..database import (
     get_connection,
@@ -10,7 +13,7 @@ from ..database import (
     insert_media_ref,
     rebuild_fts_index,
 )
-from ..models import ImportStatus, ImportScanResult
+from ..models import ImportStatus, ImportScanResult, ImportJobResponse
 from ..parsers.claude import ClaudeParser
 from ..parsers.openai import OpenAIParser
 from ..parsers.raycast import RaycastParser
@@ -21,6 +24,10 @@ IMPORTS_PATH = os.environ.get("IMPORTS_PATH", "/app/imports")
 
 # Registry of available parsers
 PARSERS = [ClaudeParser, OpenAIParser, RaycastParser]
+
+JOB_TTL_SECONDS = 1800
+IMPORT_JOBS: dict[str, dict] = {}
+IMPORT_JOBS_LOCK = threading.Lock()
 
 
 def detect_platform(path: Path) -> str | None:
@@ -37,6 +44,71 @@ def get_parser(platform: str):
         if parser.platform == platform:
             return parser
     return None
+
+
+def _utcnow() -> datetime:
+    return datetime.utcnow()
+
+
+def cleanup_jobs(exclude_job_id: str | None = None):
+    cutoff = _utcnow() - timedelta(seconds=JOB_TTL_SECONDS)
+    with IMPORT_JOBS_LOCK:
+        to_delete = [
+            job_id for job_id, job in IMPORT_JOBS.items()
+            if job_id != exclude_job_id
+            and job.get("completed")
+            and job.get("updated_at") < cutoff
+        ]
+        for job_id in to_delete:
+            del IMPORT_JOBS[job_id]
+
+
+def create_import_job(statuses: list[ImportStatus], completed: bool = False) -> str:
+    job_id = uuid.uuid4().hex
+    now = _utcnow()
+    with IMPORT_JOBS_LOCK:
+        IMPORT_JOBS[job_id] = {
+            "statuses": statuses,
+            "completed": completed,
+            "canceled": False,
+            "created_at": now,
+            "updated_at": now,
+        }
+    cleanup_jobs(exclude_job_id=job_id)
+    return job_id
+
+
+def mark_job_completed(job_id: str):
+    with IMPORT_JOBS_LOCK:
+        job = IMPORT_JOBS.get(job_id)
+        if job:
+            job["completed"] = True
+            job["updated_at"] = _utcnow()
+    cleanup_jobs(exclude_job_id=job_id)
+
+
+def is_job_canceled(job_id: str) -> bool:
+    with IMPORT_JOBS_LOCK:
+        job = IMPORT_JOBS.get(job_id)
+        return bool(job and job.get("canceled"))
+
+
+def get_job_snapshot(job_id: str) -> ImportJobResponse:
+    with IMPORT_JOBS_LOCK:
+        job = IMPORT_JOBS.get(job_id)
+        if not job:
+            raise HTTPException(status_code=404, detail="Import job not found")
+        job["updated_at"] = _utcnow()
+        statuses = [status.model_copy() for status in job["statuses"]]
+        completed = job["completed"]
+        canceled = job.get("canceled", False)
+    cleanup_jobs(exclude_job_id=job_id)
+    return ImportJobResponse(
+        job_id=job_id,
+        statuses=statuses,
+        completed=completed,
+        canceled=canceled,
+    )
 
 
 def resolve_import_folder(folder_name: str) -> Path | None:
@@ -73,30 +145,79 @@ def scan_imports():
     return ImportScanResult(detected_exports=detected, total_folders=len(folders))
 
 
-@router.post("/run", response_model=list[ImportStatus])
+@router.post("/run", response_model=ImportJobResponse)
 def run_import(background_tasks: BackgroundTasks):
     """Run import for all detected exports."""
     imports_path = Path(IMPORTS_PATH)
 
     if not imports_path.exists():
-        return []
+        job_id = create_import_job([], completed=True)
+        return get_job_snapshot(job_id)
 
     results = []
+    to_process = []
     folders = [d for d in imports_path.iterdir() if d.is_dir()]
 
     for folder in folders:
         platform = detect_platform(folder)
-        if not platform:
-            continue
+        if platform:
+            status = ImportStatus(
+                platform=platform,
+                source_path=str(folder),
+                status="queued",
+            )
+            results.append(status)
+            to_process.append((folder, platform, status))
+        else:
+            results.append(ImportStatus(
+                platform="unknown",
+                source_path=str(folder),
+                status="error",
+                errors=["Could not detect export format"],
+            ))
 
-        status = import_export(folder, platform, rebuild_fts=False)
-        results.append(status)
+    if not results:
+        job_id = create_import_job([], completed=True)
+        return get_job_snapshot(job_id)
 
-    if results:
-        with get_connection() as conn:
-            rebuild_fts_index(conn)
+    job_id = create_import_job(results, completed=False)
+    if to_process:
+        background_tasks.add_task(run_import_job, job_id, to_process)
+    else:
+        mark_job_completed(job_id)
 
-    return results
+    return get_job_snapshot(job_id)
+
+
+@router.get("/status/{job_id}", response_model=ImportJobResponse)
+def import_status(job_id: str):
+    """Get status for an import job."""
+    return get_job_snapshot(job_id)
+
+
+@router.post("/cancel/{job_id}", response_model=ImportJobResponse)
+def cancel_import(job_id: str):
+    """Cancel an import job."""
+    with IMPORT_JOBS_LOCK:
+        job = IMPORT_JOBS.get(job_id)
+        if not job:
+            raise HTTPException(status_code=404, detail="Import job not found")
+        if not job["completed"]:
+            job["canceled"] = True
+            job["updated_at"] = _utcnow()
+            for status in job["statuses"]:
+                if status.status in ("queued", "running"):
+                    status.status = "canceled"
+        statuses = [status.model_copy() for status in job["statuses"]]
+        completed = job["completed"]
+        canceled = job.get("canceled", False)
+    cleanup_jobs(exclude_job_id=job_id)
+    return ImportJobResponse(
+        job_id=job_id,
+        statuses=statuses,
+        completed=completed,
+        canceled=canceled,
+    )
 
 
 @router.post("/run/{folder_name}", response_model=ImportStatus)
@@ -124,22 +245,67 @@ def run_import_single(folder_name: str):
     return import_export(folder, platform, rebuild_fts=True)
 
 
-def import_export(folder: Path, platform: str, rebuild_fts: bool = True) -> ImportStatus:
+def run_import_job(job_id: str, to_process: list[tuple[Path, str, ImportStatus]]):
+    """Background task to process import job."""
+    for folder, platform, status in to_process:
+        if is_job_canceled(job_id):
+            break
+        status.status = "running"
+        import_export(
+            folder,
+            platform,
+            status=status,
+            rebuild_fts=False,
+            cancel_check=lambda: is_job_canceled(job_id),
+        )
+        if is_job_canceled(job_id):
+            break
+
+    if is_job_canceled(job_id):
+        with IMPORT_JOBS_LOCK:
+            job = IMPORT_JOBS.get(job_id)
+            if job:
+                for status in job["statuses"]:
+                    if status.status == "queued":
+                        status.status = "canceled"
+
+    with get_connection() as conn:
+        rebuild_fts_index(conn)
+
+    mark_job_completed(job_id)
+
+
+def import_export(
+    folder: Path,
+    platform: str,
+    status: ImportStatus | None = None,
+    rebuild_fts: bool = True,
+    cancel_check: Callable[[], bool] | None = None,
+) -> ImportStatus:
     """Import an export folder."""
     parser = get_parser(platform)
     if not parser:
-        return ImportStatus(
+        if status is None:
+            status = ImportStatus(
+                platform=platform,
+                source_path=str(folder),
+                status="error",
+                errors=[f"No parser available for platform: {platform}"],
+            )
+        else:
+            status.status = "error"
+            status.errors.append(f"No parser available for platform: {platform}")
+        return status
+
+    if status is None:
+        status = ImportStatus(
             platform=platform,
             source_path=str(folder),
-            status="error",
-            errors=[f"No parser available for platform: {platform}"],
+            status="running",
         )
-
-    status = ImportStatus(
-        platform=platform,
-        source_path=str(folder),
-        status="running",
-    )
+    else:
+        if status.status != "canceled":
+            status.status = "running"
 
     try:
         with get_connection() as conn:
@@ -157,6 +323,9 @@ def import_export(folder: Path, platform: str, rebuild_fts: bool = True) -> Impo
             messages_imported = 0
 
             for conv in parser.parse(folder):
+                if cancel_check and cancel_check():
+                    status.status = "canceled"
+                    break
                 conv_dict = conv.to_dict()
                 conv_dict["import_id"] = import_id
 
@@ -193,7 +362,8 @@ def import_export(folder: Path, platform: str, rebuild_fts: bool = True) -> Impo
 
             status.conversations_imported = conversations_imported
             status.messages_imported = messages_imported
-            status.status = "completed"
+            if status.status != "canceled":
+                status.status = "completed"
 
     except Exception as e:
         status.status = "error"
