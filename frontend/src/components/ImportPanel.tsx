@@ -212,9 +212,10 @@ function ImportPanel({ onImportComplete }: ImportPanelProps) {
       </p>
 
       <div className="upload-section">
-        <h3 style={{ marginBottom: '8px' }}>Upload JSON File</h3>
+        <h3 style={{ marginBottom: '8px' }}>Upload Export File</h3>
         <p className="import-note">
-          Upload a <code>.zip</code> or <code>.json</code> export file directly from your computer.
+          Upload a <code>.zip</code> or <code>.json</code> file. Filename must contain one of:
+          {' '}<code>openai</code>, <code>chatgpt</code>, <code>claude</code>, <code>anthropic</code>, or <code>raycast</code>.
         </p>
         <div className="upload-controls">
           <input
@@ -270,18 +271,18 @@ function ImportPanel({ onImportComplete }: ImportPanelProps) {
       <div className="export-guides">
         <div className="export-guide-item">
           <PlatformIcon platform="openai" size={14} className="platform-icon openai" />
-          <code>conversations.json</code>
-          <a href="https://help.openai.com/en/articles/7260999-how-do-i-export-my-chatgpt-history" target="_blank" rel="noreferrer">Request ChatGPT data</a>
+          <code>*openai*.json</code> or <code>*chatgpt*</code>
+          <a href="https://help.openai.com/en/articles/7260999-how-do-i-export-my-chatgpt-history" target="_blank" rel="noreferrer">Request data</a>
         </div>
         <div className="export-guide-item">
           <PlatformIcon platform="claude" size={14} className="platform-icon claude" />
-          <code>conversations.json</code>
-          <a href="https://support.anthropic.com/en/articles/8325615-how-do-i-export-my-data-from-claude" target="_blank" rel="noreferrer">Request Claude data</a>
+          <code>*claude*.json</code> or <code>*anthropic*</code>
+          <a href="https://support.anthropic.com/en/articles/8325615-how-do-i-export-my-data-from-claude" target="_blank" rel="noreferrer">Request data</a>
         </div>
         <div className="export-guide-item">
           <PlatformIcon platform="raycast" size={14} className="platform-icon raycast" />
-          <code>raycast_ai_chats.json</code>
-          <a href="https://www.raycast.com/manual/exporting-data" target="_blank" rel="noreferrer">Scrape Raycast data</a>
+          <code>*raycast*.json</code>
+          <a href="https://www.raycast.com/manual/exporting-data" target="_blank" rel="noreferrer">Scrape data</a>
         </div>
       </div>
 

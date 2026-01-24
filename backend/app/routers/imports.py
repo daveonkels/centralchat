@@ -42,6 +42,18 @@ IMPORT_JOBS: dict[str, dict] = {}
 IMPORT_JOBS_LOCK = threading.Lock()
 
 
+def detect_platform_from_filename(filename: str) -> str | None:
+    """Detect platform from filename keywords (case-insensitive)."""
+    name_lower = filename.lower()
+    if "openai" in name_lower or "chatgpt" in name_lower:
+        return "openai"
+    if "anthropic" in name_lower or "claude" in name_lower:
+        return "claude"
+    if "raycast" in name_lower:
+        return "raycast"
+    return None
+
+
 def detect_platform(path: Path) -> str | None:
     """Detect which platform an export belongs to."""
     for parser in PARSERS:
@@ -166,6 +178,13 @@ def _safe_extract_zip(zip_path: Path, extract_to: Path):
 
 
 def _find_export_folder(root: Path) -> tuple[Path, str] | None:
+    """Find a valid export folder in extracted archive.
+
+    Checks:
+    1. Root directory for valid export
+    2. Child directories for valid exports
+    3. JSON files with platform keywords in filename
+    """
     platform = detect_platform(root)
     if platform:
         return root, platform
@@ -176,17 +195,53 @@ def _find_export_folder(root: Path) -> tuple[Path, str] | None:
             if platform:
                 return child, platform
 
+    # Check for JSON files with platform keywords in filename
+    for child in root.iterdir():
+        if child.is_file() and child.suffix.lower() == ".json":
+            filename_platform = detect_platform_from_filename(child.name)
+            if filename_platform:
+                # Create a folder and copy the file with expected name
+                export_folder = root / "export"
+                export_folder.mkdir(parents=True, exist_ok=True)
+                expected_name = "raycast_ai_chats.json" if filename_platform == "raycast" else "conversations.json"
+                shutil.copy2(child, export_folder / expected_name)
+                platform = detect_platform(export_folder)
+                if platform:
+                    return export_folder, platform
+
     return None
 
 
 def _detect_platform_from_json_folder(folder: Path, uploaded_path: Path) -> str | None:
+    """Detect platform from uploaded JSON file.
+
+    Detection order:
+    1. Try filename-based detection (openai/chatgpt, anthropic/claude, raycast)
+    2. Try content-based detection with current filename
+    3. Fall back to renaming and re-checking
+    """
+    if uploaded_path.suffix.lower() != ".json":
+        return None
+
+    # Try filename-based detection first
+    filename_platform = detect_platform_from_filename(uploaded_path.name)
+    if filename_platform:
+        # Rename to expected filename for the detected platform
+        expected_name = "raycast_ai_chats.json" if filename_platform == "raycast" else "conversations.json"
+        expected_path = folder / expected_name
+        if uploaded_path.name != expected_name and not expected_path.exists():
+            shutil.copy2(uploaded_path, expected_path)
+        # Verify content matches the expected platform
+        platform = detect_platform(folder)
+        if platform:
+            return platform
+
+    # Try content-based detection with current filename
     platform = detect_platform(folder)
     if platform:
         return platform
 
-    if uploaded_path.suffix.lower() != ".json":
-        return None
-
+    # Fall back: try renaming to standard names
     fallback_names = []
     if uploaded_path.name != "conversations.json":
         fallback_names.append("conversations.json")
