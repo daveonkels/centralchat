@@ -206,13 +206,13 @@ function ImportPanel({ onImportComplete }: ImportPanelProps) {
 
   return (
     <div className="import-section">
-      <h3 style={{ marginBottom: '12px' }}>Import Exports</h3>
+      <h3 style={{ marginBottom: '12px' }}>Import Your AI Chat History</h3>
       <p className="import-note">
         Data stays local in <code>data/central-chat.db</code>. "New" counts only previously imported conversations.
       </p>
 
       <div className="upload-section">
-        <h3 style={{ marginBottom: '8px' }}>Upload Export</h3>
+        <h3 style={{ marginBottom: '8px' }}>Upload JSON File</h3>
         <p className="import-note">
           Upload a <code>.zip</code> or <code>.json</code> export file directly from your computer.
         </p>
@@ -268,50 +268,20 @@ function ImportPanel({ onImportComplete }: ImportPanelProps) {
       </div>
 
       <div className="export-guides">
-        <div className="export-guides-title">Export guides</div>
-        <div className="export-guides-list">
-          <div className="export-guide-card">
-            <span className="platform-badge openai">
-              <PlatformIcon platform="openai" size={12} />
-              ChatGPT
-            </span>
-            <span className="export-guide-file">Expected: <code>conversations.json</code></span>
-            <a
-              href="https://help.openai.com/en/articles/7260999-how-do-i-export-my-chatgpt-history"
-              target="_blank"
-              rel="noreferrer"
-            >
-              Learn how to export
-            </a>
-          </div>
-          <div className="export-guide-card">
-            <span className="platform-badge claude">
-              <PlatformIcon platform="claude" size={12} />
-              Claude
-            </span>
-            <span className="export-guide-file">Expected: <code>conversations.json</code></span>
-            <a
-              href="https://support.anthropic.com/en/articles/8325615-how-do-i-export-my-data-from-claude"
-              target="_blank"
-              rel="noreferrer"
-            >
-              Learn how to export
-            </a>
-          </div>
-          <div className="export-guide-card">
-            <span className="platform-badge raycast">
-              <PlatformIcon platform="raycast" size={12} />
-              Raycast
-            </span>
-            <span className="export-guide-file">Expected: <code>raycast_ai_chats.json</code></span>
-            <a
-              href="https://www.raycast.com/manual/exporting-data"
-              target="_blank"
-              rel="noreferrer"
-            >
-              Learn how to export
-            </a>
-          </div>
+        <div className="export-guide-item">
+          <PlatformIcon platform="openai" size={14} className="platform-icon openai" />
+          <code>conversations.json</code>
+          <a href="https://help.openai.com/en/articles/7260999-how-do-i-export-my-chatgpt-history" target="_blank" rel="noreferrer">Request ChatGPT data</a>
+        </div>
+        <div className="export-guide-item">
+          <PlatformIcon platform="claude" size={14} className="platform-icon claude" />
+          <code>conversations.json</code>
+          <a href="https://support.anthropic.com/en/articles/8325615-how-do-i-export-my-data-from-claude" target="_blank" rel="noreferrer">Request Claude data</a>
+        </div>
+        <div className="export-guide-item">
+          <PlatformIcon platform="raycast" size={14} className="platform-icon raycast" />
+          <code>raycast_ai_chats.json</code>
+          <a href="https://www.raycast.com/manual/exporting-data" target="_blank" rel="noreferrer">Scrape Raycast data</a>
         </div>
       </div>
 

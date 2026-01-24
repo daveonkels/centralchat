@@ -309,7 +309,7 @@ function App() {
                 className="filter-btn"
                 onClick={() => setShowImport(!showImport)}
               >
-                {showImport ? 'Hide Import' : 'Import/Export'}
+                {showImport ? 'Hide' : 'Manage Data'}
               </button>
             </>
           )}
