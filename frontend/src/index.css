@@ -105,11 +105,11 @@
   --space-12: 3rem;
 
   /* ===== BORDER RADIUS ===== */
-  --radius-sm: 6px;
-  --radius-md: 10px;
-  --radius-lg: 14px;
-  --radius-xl: 20px;
-  --radius-full: 9999px;
+  /* Simplified 3-tier system for consistency */
+  --radius-sm: 6px;      /* Small inline elements: code, count badges */
+  --radius-md: 8px;      /* Interactive elements: buttons, badges, tags, cards */
+  --radius-lg: 12px;     /* Major containers: panels, modals, sections */
+  --radius-full: 9999px; /* Pills: standalone action buttons only */
 
   /* ===== TRANSITIONS ===== */
   --transition-fast: 100ms ease;
@@ -588,7 +588,7 @@ header h1 {
   font-weight: 500;
   background: var(--bg-secondary);
   border: 1px solid var(--border-default);
-  border-radius: var(--radius-full);
+  border-radius: var(--radius-md);
   color: var(--text-secondary);
   cursor: pointer;
   transition: all var(--transition-base);
@@ -810,7 +810,7 @@ header h1 {
   background: var(--accent-muted);
   color: var(--accent-hover);
   padding: 1px 4px;
-  border-radius: 3px;
+  border-radius: var(--radius-sm);
   font-weight: 500;
 }
 
@@ -834,8 +834,8 @@ header h1 {
   font-family: var(--font-body);
   font-size: var(--text-xs);
   font-weight: 600;
-  padding: 3px 8px;
-  border-radius: var(--radius-sm);
+  padding: 4px 10px;
+  border-radius: var(--radius-md);
   text-transform: capitalize;
   letter-spacing: 0.02em;
   transition: all var(--transition-base);
@@ -1310,7 +1310,7 @@ header h1 {
   background: var(--accent-muted);
   color: var(--accent-hover);
   padding: 1px 4px;
-  border-radius: 3px;
+  border-radius: var(--radius-sm);
   font-weight: 500;
 }
 
@@ -1882,7 +1882,7 @@ header h1 {
 
 ::-webkit-scrollbar-thumb {
   background: var(--bg-elevated);
-  border-radius: 5px;
+  border-radius: var(--radius-sm);
   border: 2px solid var(--bg-primary);
 }
 
