@@ -1,4 +1,5 @@
 import { useState, useEffect, useCallback } from 'react';
+import { MdSettings, MdClose } from 'react-icons/md';
 import SearchBar from './components/SearchBar';
 import Filters from './components/Filters';
 import ConversationList from './components/ConversationList';
@@ -306,10 +307,10 @@ function App() {
               <span>{stats.total_conversations.toLocaleString()} conversations</span>
               <span>{stats.total_messages.toLocaleString()} messages</span>
               <button
-                className="filter-btn"
+                className="filter-btn manage-data-btn"
                 onClick={() => setShowImport(!showImport)}
               >
-                {showImport ? 'Hide' : 'Manage Data'}
+                {showImport ? <><MdClose /> Hide</> : <><MdSettings /> Manage Data</>}
               </button>
             </>
           )}

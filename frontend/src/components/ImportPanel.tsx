@@ -1,4 +1,5 @@
 import { useState, useEffect, ChangeEvent } from 'react';
+import { MdUpload, MdFolder, MdWarning } from 'react-icons/md';
 import {
   scanImports,
   runImport,
@@ -43,6 +44,7 @@ function ImportPanel({ onImportComplete }: ImportPanelProps) {
   const [jobCompleted, setJobCompleted] = useState(false);
   const [jobCanceled, setJobCanceled] = useState(false);
   const [canceling, setCanceling] = useState(false);
+  const [dangerZoneOpen, setDangerZoneOpen] = useState(false);
 
   useEffect(() => {
     scanImports()
@@ -194,127 +196,51 @@ function ImportPanel({ onImportComplete }: ImportPanelProps) {
     return parts[parts.length - 1] || sourcePath;
   };
 
+  // Progress calculations
   const totalJobs = results.length;
   const completedJobs = results.filter((r) => ['completed', 'error', 'canceled'].includes(r.status)).length;
   const runningJobs = results.filter((r) => r.status === 'running').length;
   const estimatedUnits = Math.min(completedJobs + runningJobs * 0.5, totalJobs);
   const estimatedPercent = totalJobs > 0 ? Math.round((estimatedUnits / totalJobs) * 100) : 0;
   const displayPercent = jobCompleted ? 100 : estimatedPercent;
+
   const progressLabel = jobCanceled
-    ? (jobCompleted ? 'Canceled' : 'Canceling')
-    : (jobCompleted ? 'Completed' : 'Estimated progress');
+    ? (jobCompleted ? 'Canceled' : 'Canceling...')
+    : (jobCompleted ? 'Complete' : 'Importing...');
+
+  // Find currently running job for status display
+  const runningJob = results.find((r) => r.status === 'running');
+  const lastCompletedJob = results.filter((r) => r.status === 'completed').slice(-1)[0];
+  const statusJob = runningJob || lastCompletedJob;
+
+  // Check if any operation is in progress
+  const isOperating = importing || uploading || purging;
 
   return (
     <div className="import-section">
-      <h3 style={{ marginBottom: '12px' }}>Import Your AI Chat History</h3>
-      <p className="import-note">
-        Data stays local in <code>data/central-chat.db</code>. "New" counts only previously imported conversations.
-      </p>
+      <h2>Import Data</h2>
 
-      <div className="upload-section">
-        <h3 style={{ marginBottom: '8px' }}>Upload Export File</h3>
-        <p className="import-note">
-          Upload a <code>.zip</code> or <code>.json</code> file. Filename must contain one of:
-          {' '}<code>openai</code>, <code>chatgpt</code>, <code>claude</code>, <code>anthropic</code>, or <code>raycast</code>.
-        </p>
-        <div className="upload-controls">
-          <input
-            key={uploadInputKey}
-            className="upload-input"
-            type="file"
-            accept=".zip,.json,application/zip,application/json"
-            onChange={handleUploadChange}
-            disabled={uploading || importing || purging}
-          />
-          <button
-            className="upload-btn"
-            onClick={handleUpload}
-            disabled={!uploadFile || uploading || importing || purging}
-            type="button"
-          >
-            {uploading ? 'Uploading...' : 'Upload & Import'}
-          </button>
+      {/* Reassurance callout */}
+      <div className="import-reassurance">
+        <div className="import-reassurance-item">
+          <span className="check">✓</span>
+          <span>Data stays local in <code>data/central-chat.db</code></span>
         </div>
-        {uploadFile && (
-          <div className="upload-file">
-            Selected: <strong>{uploadFile.name}</strong>
-          </div>
-        )}
-        {(importing || purging) && (
-          <div className="upload-hint">Pause other operations before uploading.</div>
-        )}
-        {uploadError && (
-          <div className="import-status error">
-            Error: {uploadError}
-          </div>
-        )}
-        {uploadResult && (
-          <div className={`import-status ${uploadResult.status === 'completed' ? 'success' : uploadResult.status === 'error' ? 'error' : ''}`}>
-            <strong>{uploadResult.platform}</strong> ({uploadResult.source_path}): {uploadResult.status}
-            {uploadResult.status !== 'error' && (
-              <>
-                {' '}
-                - {uploadResult.conversations_imported} conversations, {uploadResult.messages_imported} messages
-              </>
-            )}
-            {uploadResult.errors.length > 0 && (
-              <ul>
-                {uploadResult.errors.map((err, i) => (
-                  <li key={i}>{err}</li>
-                ))}
-              </ul>
-            )}
-          </div>
-        )}
-      </div>
-
-      <div className="export-guides">
-        <div className="export-guide-item">
-          <PlatformIcon platform="openai" size={14} className="platform-icon openai" />
-          <code>*openai*.json</code> or <code>*chatgpt*</code>
-          <a href="https://help.openai.com/en/articles/7260999-how-do-i-export-my-chatgpt-history" target="_blank" rel="noreferrer">Request data</a>
+        <div className="import-reassurance-item">
+          <span className="check">✓</span>
+          <span>Safe to re-import — duplicates are automatically skipped</span>
         </div>
-        <div className="export-guide-item">
-          <PlatformIcon platform="claude" size={14} className="platform-icon claude" />
-          <code>*claude*.json</code> or <code>*anthropic*</code>
-          <a href="https://support.anthropic.com/en/articles/8325615-how-do-i-export-my-data-from-claude" target="_blank" rel="noreferrer">Request data</a>
-        </div>
-        <div className="export-guide-item">
-          <PlatformIcon platform="raycast" size={14} className="platform-icon raycast" />
-          <code>*raycast*.json</code>
-          <a href="https://www.raycast.com/manual/exporting-data" target="_blank" rel="noreferrer">Scrape data</a>
+        <div className="import-reassurance-item">
+          <span className="check">✓</span>
+          <span>Only new conversations are added to your archive</span>
         </div>
       </div>
 
-      {exports.length === 0 ? (
-        <p style={{ color: 'var(--text-secondary)' }}>
-          No exports detected. Place export folders in the <code>imports/</code> directory.
-        </p>
-      ) : (
-        <>
-          <p style={{ color: 'var(--text-secondary)', marginBottom: '12px' }}>
-            Detected {exports.length} data file{exports.length !== 1 ? 's' : ''}:
-          </p>
-          <ul style={{ marginBottom: '16px', paddingLeft: '20px' }}>
-            {exports.map((exp) => (
-              <li key={exp.path} style={{ color: 'var(--text-secondary)' }}>
-                <span className={`platform-badge ${exp.platform}`}>
-                  <PlatformIcon platform={exp.platform} size={12} />
-                  {exp.platform}
-                </span>
-                {' '}{exp.name}
-              </li>
-            ))}
-          </ul>
-
-          <div className="import-actions">
-            <button
-              className="import-btn"
-              onClick={handleImport}
-              disabled={importing}
-            >
-              {importing ? 'Importing...' : 'Run Import'}
-            </button>
+      {/* Global progress banner */}
+      {(importing || uploading || (results.length > 0 && !jobCompleted)) && (
+        <div className="import-progress-banner">
+          <div className="import-progress-header">
+            <span className="import-progress-title">{progressLabel}</span>
             {importing && jobId && (
               <button
                 className="import-cancel"
@@ -326,26 +252,152 @@ function ImportPanel({ onImportComplete }: ImportPanelProps) {
               </button>
             )}
           </div>
-        </>
-      )}
-
-      {error && (
-        <div className="import-status error">
-          Error: {error}
+          <div className="import-progress-bar">
+            <div
+              className="import-progress-fill"
+              style={{ width: `${displayPercent}%` }}
+            />
+          </div>
+          {statusJob && (
+            <div className="import-progress-status">
+              {statusJob.platform}: {statusJob.conversations_imported} new conversations
+            </div>
+          )}
+          {uploading && (
+            <div className="import-progress-status">
+              Uploading {uploadFile?.name}...
+            </div>
+          )}
         </div>
       )}
 
-      {totalJobs > 0 && (
-        <div className="import-progress">
-          <progress max={100} value={displayPercent} />
-          <span>
-            {progressLabel}: {displayPercent}%
-          </span>
-        </div>
-      )}
+      {/* Two import method cards */}
+      <div className="import-methods">
+        {/* Upload File Card */}
+        <div className="import-method-card">
+          <div className="import-method-title"><MdUpload /> Upload File</div>
+          <div className="import-method-content">
+            <div className="upload-controls">
+              <input
+                key={uploadInputKey}
+                className="upload-input"
+                type="file"
+                accept=".zip,.json,application/zip,application/json"
+                onChange={handleUploadChange}
+                disabled={isOperating}
+              />
+            </div>
+            {uploadFile && (
+              <div className="upload-file">
+                Selected: <strong>{uploadFile.name}</strong>
+              </div>
+            )}
+            <button
+              className="upload-btn"
+              onClick={handleUpload}
+              disabled={!uploadFile || isOperating}
+              type="button"
+            >
+              {uploading ? 'Uploading...' : 'Upload & Import'}
+            </button>
 
-      {results.length > 0 && (
-        <div style={{ marginTop: '16px' }}>
+            <p className="import-note">
+              Accepts <code>.zip</code> or <code>.json</code> files. Filename must include:
+              openai, chatgpt, claude, anthropic, or raycast.
+            </p>
+
+            {uploadError && (
+              <div className="import-status error">
+                Error: {uploadError}
+              </div>
+            )}
+            {uploadResult && (
+              <div className={`import-status ${uploadResult.status === 'completed' ? 'success' : uploadResult.status === 'error' ? 'error' : ''}`}>
+                <strong>{uploadResult.platform}</strong>: {uploadResult.status}
+                {uploadResult.status !== 'error' && (
+                  <> — {uploadResult.conversations_imported} conversations, {uploadResult.messages_imported} messages</>
+                )}
+                {uploadResult.errors.length > 0 && (
+                  <ul>
+                    {uploadResult.errors.map((err, i) => (
+                      <li key={i}>{err}</li>
+                    ))}
+                  </ul>
+                )}
+              </div>
+            )}
+
+            {/* Export links */}
+            <div className="export-links">
+              <div className="export-links-title">Get Your Data</div>
+              <div className="export-link">
+                <PlatformIcon platform="openai" size={14} className="platform-icon openai" />
+                <a href="https://help.openai.com/en/articles/7260999-how-do-i-export-my-chatgpt-history" target="_blank" rel="noreferrer">
+                  Request ChatGPT export
+                </a>
+              </div>
+              <div className="export-link">
+                <PlatformIcon platform="claude" size={14} className="platform-icon claude" />
+                <a href="https://support.anthropic.com/en/articles/8325615-how-do-i-export-my-data-from-claude" target="_blank" rel="noreferrer">
+                  Request Claude export
+                </a>
+              </div>
+              <div className="export-link">
+                <PlatformIcon platform="raycast" size={14} className="platform-icon raycast" />
+                <a href="https://www.raycast.com/manual/exporting-data" target="_blank" rel="noreferrer">
+                  Export Raycast chats
+                </a>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        {/* Folder Import Card */}
+        <div className="import-method-card">
+          <div className="import-method-title"><MdFolder /> Import from Folder</div>
+          <div className="import-method-content">
+            <p className="import-note">Place export files in the imports folder:</p>
+            <div className="folder-path">./imports/</div>
+
+            {exports.length === 0 ? (
+              <p className="no-files">No export files detected</p>
+            ) : (
+              <div className="detected-files">
+                <div className="detected-files-title">
+                  Detected {exports.length} file{exports.length !== 1 ? 's' : ''}
+                </div>
+                {exports.map((exp) => (
+                  <div key={exp.path} className="detected-file">
+                    <span className={`platform-badge ${exp.platform}`}>
+                      <PlatformIcon platform={exp.platform} size={12} />
+                      {exp.platform}
+                    </span>
+                    <span className="file-name">{exp.name}</span>
+                  </div>
+                ))}
+              </div>
+            )}
+
+            <button
+              className="import-btn"
+              onClick={handleImport}
+              disabled={isOperating || exports.length === 0}
+            >
+              {importing ? 'Importing...' : 'Import All'}
+            </button>
+
+            {error && (
+              <div className="import-status error">
+                Error: {error}
+              </div>
+            )}
+          </div>
+        </div>
+      </div>
+
+      {/* Import results */}
+      {results.length > 0 && jobCompleted && (
+        <div className="import-results">
           {results.map((result, idx) => (
             <div
               key={idx}
@@ -354,8 +406,7 @@ function ImportPanel({ onImportComplete }: ImportPanelProps) {
               <strong>{result.platform}</strong> ({formatSourceName(result.source_path)}): {result.status}
               {result.status !== 'error' && (
                 <>
-                  {' '}
-                  - {result.conversations_found} found, {result.conversations_imported}{' '}
+                  {' '} — {result.conversations_found} found, {result.conversations_imported}{' '}
                   <span className="import-count-new" title="New conversations not previously imported">
                     new
                   </span>
@@ -374,68 +425,78 @@ function ImportPanel({ onImportComplete }: ImportPanelProps) {
         </div>
       )}
 
-      <div className="purge-section">
-        <h3 style={{ marginBottom: '8px' }}>Purge Provider Data</h3>
-        <p className="import-note">
-          Permanently deletes all conversations, messages, and media refs for selected providers.
-        </p>
+      {/* Danger Zone (collapsed) */}
+      <div className="danger-zone">
+        <button
+          className="danger-zone-toggle"
+          onClick={() => setDangerZoneOpen(!dangerZoneOpen)}
+          type="button"
+        >
+          <span className={`chevron ${dangerZoneOpen ? 'open' : ''}`}>▶</span>
+          <MdWarning className="danger-icon" />
+          Danger Zone
+        </button>
 
-        <div className="purge-options">
-          {PLATFORM_OPTIONS.map((platform) => {
-            const count = stats ? (stats.by_platform?.[platform.id] ?? 0) : null;
-            const countLabel = typeof count === 'number'
-              ? `${count.toLocaleString()} conversations`
-              : 'Loading...';
+        {dangerZoneOpen && (
+          <div className="danger-zone-content">
+            <p className="danger-zone-note">
+              Permanently delete all conversations, messages, and media refs for selected platforms.
+              This cannot be undone.
+            </p>
 
-            return (
-              <label key={platform.id} className="purge-option">
-                <input
-                  type="checkbox"
-                  checked={!!purgeSelection[platform.id]}
-                  onChange={() => setPurgeSelection((prev) => ({
-                    ...prev,
-                    [platform.id]: !prev[platform.id],
-                  }))}
-                  disabled={purging || importing}
-                />
-                <span className={`platform-badge ${platform.id}`}>
-                  <PlatformIcon platform={platform.id} size={12} />
-                  {platform.label}
-                </span>
-                <span className="purge-count">{countLabel}</span>
-              </label>
-            );
-          })}
-        </div>
+            <div className="purge-options">
+              {PLATFORM_OPTIONS.map((platform) => {
+                const count = stats ? (stats.by_platform?.[platform.id] ?? 0) : null;
+                const countLabel = typeof count === 'number'
+                  ? `${count.toLocaleString()} conversations`
+                  : 'Loading...';
 
-        <div className="purge-actions">
-          <button
-            className="purge-btn"
-            onClick={handlePurge}
-            disabled={purging || importing || selectedPlatforms.length === 0}
-            type="button"
-          >
-            {purging ? 'Purging...' : 'Purge Selected'}
-          </button>
-          {importing && (
-            <span className="purge-hint">Stop import to purge data.</span>
-          )}
-        </div>
+                return (
+                  <label key={platform.id} className="purge-option">
+                    <input
+                      type="checkbox"
+                      checked={!!purgeSelection[platform.id]}
+                      onChange={() => setPurgeSelection((prev) => ({
+                        ...prev,
+                        [platform.id]: !prev[platform.id],
+                      }))}
+                      disabled={purging || importing}
+                    />
+                    <span className={`platform-badge ${platform.id}`}>
+                      <PlatformIcon platform={platform.id} size={12} />
+                      {platform.label}
+                    </span>
+                    <span className="purge-count">{countLabel}</span>
+                  </label>
+                );
+              })}
+            </div>
 
-        {purgeError && (
-          <div className="import-status error">
-            Error: {purgeError}
-          </div>
-        )}
+            <button
+              className="purge-btn"
+              onClick={handlePurge}
+              disabled={purging || importing || selectedPlatforms.length === 0}
+              type="button"
+            >
+              {purging ? 'Purging...' : 'Purge Selected'}
+            </button>
 
-        {purgeResults.length > 0 && (
-          <div className="purge-results">
-            {purgeResults.map((result) => (
-              <div key={result.platform} className="import-status success">
-                <strong>{result.platform}</strong>: deleted {result.conversations_deleted} conversations,{' '}
-                {result.messages_deleted} messages, {result.media_deleted} media refs
+            {purgeError && (
+              <div className="import-status error">
+                Error: {purgeError}
               </div>
-            ))}
+            )}
+
+            {purgeResults.length > 0 && (
+              <div className="purge-results">
+                {purgeResults.map((result) => (
+                  <div key={result.platform} className="import-status success">
+                    <strong>{result.platform}</strong>: deleted {result.conversations_deleted} conversations,{' '}
+                    {result.messages_deleted} messages, {result.media_deleted} media refs
+                  </div>
+                ))}
+              </div>
+            )}
           </div>
         )}
       </div>

@@ -615,6 +615,11 @@ header h1::after {
   overflow: hidden;
 }
 
+.filter-btn svg {
+  font-size: 1.15em;
+  flex-shrink: 0;
+}
+
 .filter-btn:hover {
   background: var(--bg-tertiary);
   border-color: var(--border-strong);
@@ -1606,52 +1611,125 @@ header h1::after {
   border: 1px solid var(--border-default);
 }
 
-.import-btn {
-  padding: var(--space-3) var(--space-6);
-  font-family: var(--font-body);
-  font-size: var(--text-sm);
-  font-weight: 500;
-  background: var(--accent);
-  border: none;
-  border-radius: var(--radius-md);
-  color: white;
-  cursor: pointer;
-  transition: all var(--transition-base);
+.import-section h2 {
+  margin: 0 0 var(--space-4) 0;
+  font-size: var(--text-lg);
+  font-weight: 600;
+  color: var(--text-primary);
 }
 
-.import-btn:hover {
-  background: var(--accent-hover);
-  transform: translateY(-1px);
-  box-shadow: var(--shadow-glow-accent);
-}
-
-.import-btn:active {
-  transform: translateY(0);
-}
-
-.import-btn:disabled {
-  opacity: 0.5;
-  cursor: not-allowed;
-  transform: none;
-  box-shadow: none;
-}
-
-.import-note {
-  font-size: var(--text-xs);
-  color: var(--text-muted);
-  margin-bottom: var(--space-3);
-}
-
-.upload-section {
+/* Reassurance callout */
+.import-reassurance {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
   margin-bottom: var(--space-4);
-  padding: var(--space-4);
-  border-radius: var(--radius-md);
-  border: 1px solid var(--border-default);
+}
+
+.import-reassurance-item {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  font-size: var(--text-sm);
+  color: var(--text-secondary);
+}
+
+.import-reassurance-item .check {
+  color: var(--success);
+  font-weight: 600;
+}
+
+/* Global progress banner */
+.import-progress-banner {
   background: var(--bg-tertiary);
+  border: 1px solid var(--border-default);
+  border-radius: var(--radius-md);
+  padding: var(--space-4);
+  margin-bottom: var(--space-4);
+}
+
+.import-progress-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: var(--space-2);
+}
+
+.import-progress-title {
+  font-size: var(--text-sm);
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--text-secondary);
+}
+
+.import-progress-bar {
+  height: 8px;
+  background: var(--bg-elevated);
+  border-radius: var(--radius-sm);
+  overflow: hidden;
+  margin-bottom: var(--space-2);
+}
+
+.import-progress-fill {
+  height: 100%;
+  background: var(--accent);
+  transition: width 0.3s ease;
+}
+
+.import-progress-status {
+  font-size: var(--text-sm);
+  color: var(--text-muted);
+}
+
+/* Two-column import methods */
+.import-methods {
   display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: var(--space-4);
+  margin-bottom: var(--space-4);
+}
+
+@media (max-width: 800px) {
+  .import-methods {
+    grid-template-columns: 1fr;
+  }
+}
+
+.import-method-card {
+  background: var(--bg-tertiary);
+  border: 1px solid var(--border-default);
+  border-radius: var(--radius-md);
+  padding: var(--space-4);
+  display: flex;
+  flex-direction: column;
+}
+
+.import-method-title {
+  font-size: var(--text-sm);
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--text-secondary);
+  margin-bottom: var(--space-3);
+  display: flex;
+  align-items: center;
   gap: var(--space-2);
 }
 
+.import-method-title svg {
+  font-size: 1.25em;
+  flex-shrink: 0;
+}
+
+.import-method-content {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+}
+
+/* Upload controls */
 .upload-controls {
   display: flex;
   flex-wrap: wrap;
@@ -1664,34 +1742,37 @@ header h1::after {
   color: var(--text-secondary);
 }
 
-.upload-btn {
-  padding: var(--space-3) var(--space-6);
+.upload-btn,
+.import-btn {
+  padding: var(--space-2) var(--space-4);
   font-family: var(--font-body);
   font-size: var(--text-sm);
   font-weight: 500;
-  background: transparent;
-  border: 1px solid var(--border-strong);
+  background: var(--accent);
+  border: none;
   border-radius: var(--radius-md);
-  color: var(--text-primary);
+  color: white;
   cursor: pointer;
   transition: all var(--transition-base);
+  align-self: flex-start;
 }
 
-.upload-btn:hover {
-  border-color: var(--accent);
-  box-shadow: var(--shadow-glow-accent);
+.upload-btn:hover,
+.import-btn:hover {
+  background: var(--accent-hover);
   transform: translateY(-1px);
 }
 
-.upload-btn:active {
+.upload-btn:active,
+.import-btn:active {
   transform: translateY(0);
 }
 
-.upload-btn:disabled {
+.upload-btn:disabled,
+.import-btn:disabled {
   opacity: 0.5;
   cursor: not-allowed;
   transform: none;
-  box-shadow: none;
 }
 
 .upload-file {
@@ -1704,50 +1785,131 @@ header h1::after {
   color: var(--text-muted);
 }
 
-.export-guides {
-  display: flex;
-  flex-wrap: wrap;
-  gap: var(--space-4);
-  margin-bottom: var(--space-4);
-}
-
-.export-guide-item {
-  display: flex;
-  align-items: center;
-  gap: var(--space-2);
+.import-note {
   font-size: var(--text-xs);
   color: var(--text-muted);
+  line-height: 1.5;
 }
 
-.export-guide-item code {
+.import-note code {
   font-family: var(--font-mono);
   color: var(--text-secondary);
 }
 
-.export-guide-item a {
+/* Export links within upload card */
+.export-links {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  margin-top: auto;
+  padding-top: var(--space-3);
+  border-top: 1px solid var(--border-subtle);
+}
+
+.export-links-title {
+  font-size: var(--text-xs);
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--text-muted);
+}
+
+.export-link {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  font-size: var(--text-sm);
+  color: var(--text-secondary);
+}
+
+.export-link a {
   color: var(--accent);
   text-decoration: none;
 }
 
-.export-guide-item a:hover {
+.export-link a:hover {
   text-decoration: underline;
+}
+
+/* Folder import card */
+.folder-path {
+  font-family: var(--font-mono);
+  font-size: var(--text-sm);
+  color: var(--text-secondary);
+  background: var(--bg-elevated);
+  padding: var(--space-2) var(--space-3);
+  border-radius: var(--radius-sm);
+}
+
+.detected-files {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+}
+
+.detected-files-title {
+  font-size: var(--text-xs);
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--text-muted);
+}
+
+.detected-file {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  font-size: var(--text-sm);
+  color: var(--text-secondary);
+}
+
+.detected-file .file-name {
+  color: var(--text-muted);
+}
+
+.no-files {
+  font-size: var(--text-sm);
+  color: var(--text-muted);
+  font-style: italic;
+}
+
+
+/* Import results */
+.import-results {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  margin-top: var(--space-3);
+}
+
+.import-status {
+  font-size: var(--text-sm);
+  padding: var(--space-2) var(--space-3);
+  border-radius: var(--radius-sm);
+  background: var(--bg-tertiary);
+}
+
+.import-status.success {
+  color: var(--success);
+}
+
+.import-status.error {
+  color: var(--error);
+}
+
+.import-status.canceled {
+  color: var(--warning);
 }
 
 .import-count-new {
   text-decoration: underline dotted;
   cursor: help;
 }
-.import-actions {
-  display: flex;
-  align-items: center;
-  gap: var(--space-2);
-}
 
+/* Cancel button in progress banner */
 .import-cancel {
   background: transparent;
   border: 1px solid var(--border-default);
   color: var(--text-secondary);
-  padding: 8px 12px;
+  padding: var(--space-1) var(--space-3);
   border-radius: var(--radius-sm);
   font-size: var(--text-sm);
   cursor: pointer;
@@ -1764,49 +1926,61 @@ header h1::after {
   cursor: not-allowed;
 }
 
-.import-progress {
-  margin-top: var(--space-3);
+/* Collapsible danger zone */
+.danger-zone {
+  border-top: 1px solid var(--border-default);
+  margin-top: var(--space-4);
+  padding-top: var(--space-4);
+}
+
+.danger-zone-toggle {
   display: flex;
   align-items: center;
   gap: var(--space-2);
-  font-size: var(--text-sm);
-  color: var(--text-secondary);
-}
-
-.import-progress progress {
-  width: 220px;
-  height: 10px;
-  accent-color: var(--accent);
-}
-
-.import-status {
-  margin-top: var(--space-3);
-  font-size: var(--text-sm);
-}
-
-.import-status.success {
-  color: var(--success);
-}
-
-.import-status.error {
+  background: none;
+  border: none;
   color: var(--error);
+  font-family: var(--font-body);
+  font-size: var(--text-sm);
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  cursor: pointer;
+  padding: 0;
 }
 
-.import-status.canceled {
-  color: var(--warning);
+.danger-zone-toggle:hover {
+  opacity: 0.8;
 }
 
-.purge-section {
-  margin-top: var(--space-5);
-  padding-top: var(--space-4);
-  border-top: 1px solid var(--border-default);
-  display: grid;
-  gap: var(--space-3);
+.danger-zone-toggle .chevron {
+  font-size: var(--text-xs);
+  transition: transform 0.2s ease;
+}
+
+.danger-zone-toggle .chevron.open {
+  transform: rotate(90deg);
+}
+
+.danger-zone-toggle .danger-icon {
+  font-size: 1.1em;
+}
+
+.danger-zone-content {
+  margin-top: var(--space-4);
+}
+
+.danger-zone-note {
+  font-size: var(--text-sm);
+  color: var(--text-muted);
+  margin-bottom: var(--space-3);
 }
 
 .purge-options {
-  display: grid;
+  display: flex;
+  flex-direction: column;
   gap: var(--space-2);
+  margin-bottom: var(--space-3);
 }
 
 .purge-option {
@@ -1827,14 +2001,8 @@ header h1::after {
   color: var(--text-muted);
 }
 
-.purge-actions {
-  display: flex;
-  align-items: center;
-  gap: var(--space-2);
-}
-
 .purge-btn {
-  padding: var(--space-3) var(--space-6);
+  padding: var(--space-2) var(--space-4);
   font-family: var(--font-body);
   font-size: var(--text-sm);
   font-weight: 500;
@@ -1847,9 +2015,8 @@ header h1::after {
 }
 
 .purge-btn:hover {
-  filter: brightness(1.05);
+  filter: brightness(1.1);
   transform: translateY(-1px);
-  box-shadow: 0 0 16px var(--error-muted);
 }
 
 .purge-btn:active {
@@ -1860,17 +2027,13 @@ header h1::after {
   opacity: 0.5;
   cursor: not-allowed;
   transform: none;
-  box-shadow: none;
-}
-
-.purge-hint {
-  font-size: var(--text-xs);
-  color: var(--text-muted);
 }
 
 .purge-results {
-  display: grid;
+  display: flex;
+  flex-direction: column;
   gap: var(--space-2);
+  margin-top: var(--space-3);
 }
 
 /* =============================================================================
