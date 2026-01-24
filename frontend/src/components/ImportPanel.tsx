@@ -1,15 +1,37 @@
 import { useState, useEffect } from 'react';
-import { scanImports, runImport, getImportStatus, cancelImport, DetectedExport, ImportStatus } from '../api/client';
+import {
+  scanImports,
+  runImport,
+  getImportStatus,
+  cancelImport,
+  purgePlatforms,
+  getStats,
+  DetectedExport,
+  ImportStatus,
+  PurgeResult,
+  Stats,
+} from '../api/client';
 
 interface ImportPanelProps {
   onImportComplete: () => void;
 }
+
+const PLATFORM_OPTIONS = [
+  { id: 'openai', label: 'ChatGPT' },
+  { id: 'claude', label: 'Claude' },
+  { id: 'raycast', label: 'Raycast' },
+];
 
 function ImportPanel({ onImportComplete }: ImportPanelProps) {
   const [exports, setExports] = useState<DetectedExport[]>([]);
   const [importing, setImporting] = useState(false);
   const [results, setResults] = useState<ImportStatus[]>([]);
   const [error, setError] = useState<string | null>(null);
+  const [stats, setStats] = useState<Stats | null>(null);
+  const [purgeSelection, setPurgeSelection] = useState<Record<string, boolean>>({});
+  const [purgeResults, setPurgeResults] = useState<PurgeResult[]>([]);
+  const [purgeError, setPurgeError] = useState<string | null>(null);
+  const [purging, setPurging] = useState(false);
   const [jobId, setJobId] = useState<string | null>(null);
   const [jobCompleted, setJobCompleted] = useState(false);
   const [jobCanceled, setJobCanceled] = useState(false);
@@ -19,7 +41,16 @@ function ImportPanel({ onImportComplete }: ImportPanelProps) {
     scanImports()
       .then((data) => setExports(data.detected_exports))
       .catch((err) => setError(err.message));
+    getStats()
+      .then(setStats)
+      .catch(console.error);
   }, []);
+
+  const refreshStats = () => {
+    getStats()
+      .then(setStats)
+      .catch(console.error);
+  };
 
   const handleImport = async () => {
     setImporting(true);
@@ -29,6 +60,7 @@ function ImportPanel({ onImportComplete }: ImportPanelProps) {
     setJobCompleted(false);
     setJobCanceled(false);
     setCanceling(false);
+    setPurgeError(null);
 
     try {
       const response = await runImport();
@@ -39,6 +71,7 @@ function ImportPanel({ onImportComplete }: ImportPanelProps) {
       if (response.completed) {
         setImporting(false);
         onImportComplete();
+        refreshStats();
       }
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Import failed');
@@ -58,6 +91,7 @@ function ImportPanel({ onImportComplete }: ImportPanelProps) {
         if (status.completed) {
           setImporting(false);
           onImportComplete();
+          refreshStats();
         }
       } catch (err) {
         setError(err instanceof Error ? err.message : 'Failed to refresh import status');
@@ -83,11 +117,40 @@ function ImportPanel({ onImportComplete }: ImportPanelProps) {
       if (status.completed) {
         setImporting(false);
         onImportComplete();
+        refreshStats();
       }
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to cancel import');
     } finally {
       setCanceling(false);
+    }
+  };
+
+  const selectedPlatforms = PLATFORM_OPTIONS
+    .filter((platform) => purgeSelection[platform.id])
+    .map((platform) => platform.id);
+
+  const handlePurge = async () => {
+    if (purging || selectedPlatforms.length === 0) return;
+    const label = selectedPlatforms.join(', ');
+    const confirmed = window.confirm(
+      `This will permanently delete all ${label} data from the database. This cannot be undone. Continue?`
+    );
+    if (!confirmed) return;
+
+    setPurging(true);
+    setPurgeError(null);
+    setPurgeResults([]);
+    try {
+      const response = await purgePlatforms(selectedPlatforms);
+      setPurgeResults(response.results);
+      setPurgeSelection({});
+      onImportComplete();
+      refreshStats();
+    } catch (err) {
+      setPurgeError(err instanceof Error ? err.message : 'Failed to purge data');
+    } finally {
+      setPurging(false);
     }
   };
 
@@ -236,6 +299,69 @@ function ImportPanel({ onImportComplete }: ImportPanelProps) {
           ))}
         </div>
       )}
+
+      <div className="purge-section">
+        <h3 style={{ marginBottom: '8px' }}>Purge Provider Data</h3>
+        <p className="import-note">
+          Permanently deletes all conversations, messages, and media refs for selected providers.
+        </p>
+
+        <div className="purge-options">
+          {PLATFORM_OPTIONS.map((platform) => {
+            const count = stats?.by_platform?.[platform.id];
+            const countLabel = typeof count === 'number'
+              ? `${count.toLocaleString()} conversations`
+              : 'Loading...';
+
+            return (
+              <label key={platform.id} className="purge-option">
+                <input
+                  type="checkbox"
+                  checked={!!purgeSelection[platform.id]}
+                  onChange={() => setPurgeSelection((prev) => ({
+                    ...prev,
+                    [platform.id]: !prev[platform.id],
+                  }))}
+                  disabled={purging || importing}
+                />
+                <span className={`platform-badge ${platform.id}`}>{platform.label}</span>
+                <span className="purge-count">{countLabel}</span>
+              </label>
+            );
+          })}
+        </div>
+
+        <div className="purge-actions">
+          <button
+            className="purge-btn"
+            onClick={handlePurge}
+            disabled={purging || importing || selectedPlatforms.length === 0}
+            type="button"
+          >
+            {purging ? 'Purging...' : 'Purge Selected'}
+          </button>
+          {importing && (
+            <span className="purge-hint">Stop import to purge data.</span>
+          )}
+        </div>
+
+        {purgeError && (
+          <div className="import-status error">
+            Error: {purgeError}
+          </div>
+        )}
+
+        {purgeResults.length > 0 && (
+          <div className="purge-results">
+            {purgeResults.map((result) => (
+              <div key={result.platform} className="import-status success">
+                <strong>{result.platform}</strong>: deleted {result.conversations_deleted} conversations,{' '}
+                {result.messages_deleted} messages, {result.media_deleted} media refs
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
     </div>
   );
 }

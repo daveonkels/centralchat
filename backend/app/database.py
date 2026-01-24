@@ -167,8 +167,10 @@ def insert_media_ref(conn: sqlite3.Connection, media: dict):
 
 def rebuild_fts_index(conn: sqlite3.Connection):
     """Rebuild the full-text search index from scratch."""
+    in_transaction = conn.in_transaction
     try:
-        conn.execute("BEGIN")
+        if not in_transaction:
+            conn.execute("BEGIN")
         conn.execute("DELETE FROM search_fts")
 
         # Index conversation titles
@@ -192,10 +194,85 @@ def rebuild_fts_index(conn: sqlite3.Connection):
             """
         )
 
-        conn.commit()
+        if not in_transaction:
+            conn.commit()
     except Exception:
-        conn.rollback()
+        if not in_transaction:
+            conn.rollback()
         raise
+
+
+def purge_platform_data(conn: sqlite3.Connection, platform: str) -> dict:
+    """Delete all data for a platform and return deletion counts."""
+    conversations_deleted = conn.execute(
+        "SELECT COUNT(*) FROM conversations WHERE platform = ?",
+        (platform,),
+    ).fetchone()[0]
+
+    messages_deleted = conn.execute(
+        """
+        SELECT COUNT(*) FROM messages
+        WHERE conversation_id IN (
+            SELECT id FROM conversations WHERE platform = ?
+        )
+        """,
+        (platform,),
+    ).fetchone()[0]
+
+    media_deleted = conn.execute(
+        """
+        SELECT COUNT(*) FROM media_refs
+        WHERE message_id IN (
+            SELECT id FROM messages
+            WHERE conversation_id IN (
+                SELECT id FROM conversations WHERE platform = ?
+            )
+        )
+        """,
+        (platform,),
+    ).fetchone()[0]
+
+    imports_deleted = conn.execute(
+        "SELECT COUNT(*) FROM imports WHERE platform = ?",
+        (platform,),
+    ).fetchone()[0]
+
+    conn.execute(
+        """
+        DELETE FROM media_refs
+        WHERE message_id IN (
+            SELECT id FROM messages
+            WHERE conversation_id IN (
+                SELECT id FROM conversations WHERE platform = ?
+            )
+        )
+        """,
+        (platform,),
+    )
+    conn.execute(
+        """
+        DELETE FROM messages
+        WHERE conversation_id IN (
+            SELECT id FROM conversations WHERE platform = ?
+        )
+        """,
+        (platform,),
+    )
+    conn.execute(
+        "DELETE FROM conversations WHERE platform = ?",
+        (platform,),
+    )
+    conn.execute(
+        "DELETE FROM imports WHERE platform = ?",
+        (platform,),
+    )
+
+    return {
+        "conversations_deleted": conversations_deleted,
+        "messages_deleted": messages_deleted,
+        "media_deleted": media_deleted,
+        "imports_deleted": imports_deleted,
+    }
 
 
 def _build_search_filters(

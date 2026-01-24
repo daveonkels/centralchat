@@ -12,8 +12,16 @@ from ..database import (
     insert_message,
     insert_media_ref,
     rebuild_fts_index,
+    purge_platform_data,
 )
-from ..models import ImportStatus, ImportScanResult, ImportJobResponse
+from ..models import (
+    ImportStatus,
+    ImportScanResult,
+    ImportJobResponse,
+    PurgeRequest,
+    PurgeResult,
+    PurgeResponse,
+)
 from ..parsers.claude import ClaudeParser
 from ..parsers.openai import OpenAIParser
 from ..parsers.raycast import RaycastParser
@@ -24,6 +32,7 @@ IMPORTS_PATH = os.environ.get("IMPORTS_PATH", "/app/imports")
 
 # Registry of available parsers
 PARSERS = [ClaudeParser, OpenAIParser, RaycastParser]
+AVAILABLE_PLATFORMS = {parser.platform for parser in PARSERS}
 
 JOB_TTL_SECONDS = 1800
 IMPORT_JOBS: dict[str, dict] = {}
@@ -61,6 +70,11 @@ def cleanup_jobs(exclude_job_id: str | None = None):
         ]
         for job_id in to_delete:
             del IMPORT_JOBS[job_id]
+
+
+def has_active_import_job() -> bool:
+    with IMPORT_JOBS_LOCK:
+        return any(not job.get("completed") for job in IMPORT_JOBS.values())
 
 
 def create_import_job(statuses: list[ImportStatus], completed: bool = False) -> str:
@@ -218,6 +232,42 @@ def cancel_import(job_id: str):
         completed=completed,
         canceled=canceled,
     )
+
+
+@router.post("/purge", response_model=PurgeResponse)
+def purge_platforms(request: PurgeRequest):
+    """Permanently delete all data for one or more platforms."""
+    platforms = [p.strip().lower() for p in request.platforms if p and p.strip()]
+    if not platforms:
+        raise HTTPException(status_code=400, detail="No platforms provided")
+
+    invalid = [p for p in platforms if p not in AVAILABLE_PLATFORMS]
+    if invalid:
+        raise HTTPException(
+            status_code=400,
+            detail=f"Unsupported platforms: {', '.join(sorted(set(invalid)))}",
+        )
+
+    if has_active_import_job():
+        raise HTTPException(
+            status_code=409,
+            detail="Cannot purge while an import job is running",
+        )
+
+    results: list[PurgeResult] = []
+    with get_connection() as conn:
+        try:
+            conn.execute("BEGIN")
+            for platform in sorted(set(platforms)):
+                counts = purge_platform_data(conn, platform)
+                results.append(PurgeResult(platform=platform, **counts))
+            rebuild_fts_index(conn)
+            conn.commit()
+        except Exception:
+            conn.rollback()
+            raise
+
+    return PurgeResponse(results=results)
 
 
 @router.post("/run/{folder_name}", response_model=ImportStatus)

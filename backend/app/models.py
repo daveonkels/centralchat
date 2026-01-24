@@ -86,6 +86,22 @@ class ImportJobResponse(BaseModel):
     canceled: bool = False
 
 
+class PurgeRequest(BaseModel):
+    platforms: list[str] = Field(default_factory=list)
+
+
+class PurgeResult(BaseModel):
+    platform: str
+    conversations_deleted: int
+    messages_deleted: int
+    media_deleted: int
+    imports_deleted: int
+
+
+class PurgeResponse(BaseModel):
+    results: list[PurgeResult]
+
+
 class StatsResponse(BaseModel):
     total_conversations: int
     total_messages: int

@@ -84,6 +84,18 @@ export interface ImportJobResponse {
   canceled: boolean;
 }
 
+export interface PurgeResult {
+  platform: string;
+  conversations_deleted: number;
+  messages_deleted: number;
+  media_deleted: number;
+  imports_deleted: number;
+}
+
+export interface PurgeResponse {
+  results: PurgeResult[];
+}
+
 export interface DetectedExport {
   path: string;
   name: string;
@@ -161,5 +173,24 @@ export async function getImportStatus(jobId: string): Promise<ImportJobResponse>
 export async function cancelImport(jobId: string): Promise<ImportJobResponse> {
   const res = await fetch(`${API_BASE}/import/cancel/${jobId}`, { method: 'POST' });
   if (!res.ok) throw new Error('Failed to cancel import');
+  return res.json();
+}
+
+export async function purgePlatforms(platforms: string[]): Promise<PurgeResponse> {
+  const res = await fetch(`${API_BASE}/import/purge`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ platforms }),
+  });
+  if (!res.ok) {
+    let message = 'Failed to purge data';
+    try {
+      const data = await res.json();
+      if (data?.detail) message = data.detail;
+    } catch {
+      // Ignore parse errors.
+    }
+    throw new Error(message);
+  }
   return res.json();
 }
