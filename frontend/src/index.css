@@ -3,7 +3,7 @@
    ============================================================================= */
 
 /* Font imports must come first */
-@import url('https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Doto:wght@400&family=JetBrains+Mono:wght@400;500&display=swap');
 
 /* =============================================================================
    CSS CUSTOM PROPERTIES
@@ -15,6 +15,7 @@
   --font-display: -apple-system, BlinkMacSystemFont, 'SF Pro Display', 'Segoe UI', Roboto, sans-serif;
   --font-body: -apple-system, BlinkMacSystemFont, 'SF Pro Text', 'Segoe UI', Roboto, sans-serif;
   --font-mono: 'JetBrains Mono', 'SF Mono', 'Fira Code', 'Cascadia Code', monospace;
+  --font-logo: 'Doto', monospace;
 
   /* ===== TYPOGRAPHY SCALE ===== */
   --text-xs: 0.75rem;
@@ -325,14 +326,37 @@ header::after {
 }
 
 header h1 {
-  font-family: var(--font-display);
+  font-family: var(--font-logo);
   font-size: var(--text-2xl);
-  font-weight: 600;
-  letter-spacing: -0.025em;
-  background: linear-gradient(135deg, var(--text-primary), var(--text-secondary));
-  -webkit-background-clip: text;
-  -webkit-text-fill-color: transparent;
-  background-clip: text;
+  font-weight: 400;
+  letter-spacing: 0.05em;
+  color: var(--text-primary);
+  animation: logo-breathe 4s ease-in-out infinite;
+  display: flex;
+  align-items: center;
+  gap: 0.1em;
+}
+
+/* Blinking terminal cursor after logo */
+header h1::after {
+  content: '_';
+  color: var(--accent);
+  animation: cursor-blink 1.06s step-end infinite;
+  font-weight: 400;
+}
+
+@keyframes logo-breathe {
+  0%, 100% {
+    text-shadow: 0 0 0 transparent;
+  }
+  50% {
+    text-shadow: 0 0 12px var(--accent-glow);
+  }
+}
+
+@keyframes cursor-blink {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0; }
 }
 
 .stats {
@@ -517,10 +541,6 @@ header h1 {
 }
 
 .search-help code {
-  background: var(--bg-elevated);
-  border: 1px solid var(--border-subtle);
-  padding: 2px 6px;
-  border-radius: var(--radius-sm);
   font-family: var(--font-mono);
   font-size: 11px;
   color: var(--text-secondary);
