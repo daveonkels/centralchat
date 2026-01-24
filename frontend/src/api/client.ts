@@ -176,6 +176,23 @@ export async function cancelImport(jobId: string): Promise<ImportJobResponse> {
   return res.json();
 }
 
+export async function uploadImport(file: File): Promise<ImportStatus> {
+  const body = new FormData();
+  body.append('file', file);
+  const res = await fetch(`${API_BASE}/import/upload`, { method: 'POST', body });
+  if (!res.ok) {
+    let message = 'Upload failed';
+    try {
+      const data = await res.json();
+      if (data?.detail) message = data.detail;
+    } catch {
+      // Ignore parse errors.
+    }
+    throw new Error(message);
+  }
+  return res.json();
+}
+
 export async function purgePlatforms(platforms: string[]): Promise<PurgeResponse> {
   const res = await fetch(`${API_BASE}/import/purge`, {
     method: 'POST',

@@ -1,9 +1,12 @@
-from fastapi import APIRouter, BackgroundTasks, HTTPException
+from fastapi import APIRouter, BackgroundTasks, HTTPException, UploadFile, File
 from pathlib import Path
 from datetime import datetime, timedelta
 import os
+import shutil
 import threading
+import tempfile
 import uuid
+import zipfile
 from typing import Callable
 
 from ..database import (
@@ -136,6 +139,72 @@ def resolve_import_folder(folder_name: str) -> Path | None:
     return target
 
 
+def _save_upload_file(upload: UploadFile, destination: Path):
+    destination.parent.mkdir(parents=True, exist_ok=True)
+    with destination.open("wb") as f:
+        shutil.copyfileobj(upload.file, f)
+
+
+def _safe_extract_zip(zip_path: Path, extract_to: Path):
+    extract_to.mkdir(parents=True, exist_ok=True)
+    extract_root = extract_to.resolve()
+    with zipfile.ZipFile(zip_path) as archive:
+        for info in archive.infolist():
+            target_path = (extract_to / info.filename).resolve()
+            try:
+                target_path.relative_to(extract_root)
+            except ValueError:
+                raise HTTPException(status_code=400, detail="Invalid archive paths detected")
+
+            if info.is_dir():
+                target_path.mkdir(parents=True, exist_ok=True)
+                continue
+
+            target_path.parent.mkdir(parents=True, exist_ok=True)
+            with archive.open(info) as source, target_path.open("wb") as dest:
+                shutil.copyfileobj(source, dest)
+
+
+def _find_export_folder(root: Path) -> tuple[Path, str] | None:
+    platform = detect_platform(root)
+    if platform:
+        return root, platform
+
+    for child in root.iterdir():
+        if child.is_dir():
+            platform = detect_platform(child)
+            if platform:
+                return child, platform
+
+    return None
+
+
+def _detect_platform_from_json_folder(folder: Path, uploaded_path: Path) -> str | None:
+    platform = detect_platform(folder)
+    if platform:
+        return platform
+
+    if uploaded_path.suffix.lower() != ".json":
+        return None
+
+    fallback_names = []
+    if uploaded_path.name != "conversations.json":
+        fallback_names.append("conversations.json")
+    if uploaded_path.name != "raycast_ai_chats.json":
+        fallback_names.append("raycast_ai_chats.json")
+
+    for name in fallback_names:
+        candidate_path = folder / name
+        if candidate_path.exists():
+            continue
+        shutil.copy2(uploaded_path, candidate_path)
+        platform = detect_platform(folder)
+        if platform:
+            return platform
+
+    return None
+
+
 @router.get("/scan", response_model=ImportScanResult)
 def scan_imports():
     """Scan the imports directory for export folders."""
@@ -157,6 +226,67 @@ def scan_imports():
             })
 
     return ImportScanResult(detected_exports=detected, total_folders=len(folders))
+
+
+@router.post("/upload", response_model=ImportStatus)
+def upload_import(file: UploadFile = File(...)):
+    """Upload a single export file (zip or json) and import it immediately."""
+    if has_active_import_job():
+        raise HTTPException(
+            status_code=409,
+            detail="Cannot upload while an import job is running",
+        )
+
+    filename = Path(file.filename or "upload").name
+    if not filename:
+        raise HTTPException(status_code=400, detail="Upload must include a filename")
+
+    with tempfile.TemporaryDirectory(prefix="central-chat-upload-") as temp_dir:
+        temp_path = Path(temp_dir)
+        upload_path = temp_path / filename
+        _save_upload_file(file, upload_path)
+
+        platform = None
+        folder = None
+
+        if zipfile.is_zipfile(upload_path):
+            extract_dir = temp_path / "extracted"
+            try:
+                _safe_extract_zip(upload_path, extract_dir)
+            except zipfile.BadZipFile as exc:
+                raise HTTPException(status_code=400, detail="Invalid zip file") from exc
+
+            found = _find_export_folder(extract_dir)
+            if found:
+                folder, platform = found
+        else:
+            if upload_path.suffix.lower() != ".json":
+                raise HTTPException(
+                    status_code=400,
+                    detail="Unsupported file type. Upload a .zip or .json export.",
+                )
+            folder = temp_path / "export"
+            folder.mkdir(parents=True, exist_ok=True)
+            target_path = folder / filename
+            if upload_path != target_path:
+                shutil.move(upload_path, target_path)
+            platform = _detect_platform_from_json_folder(folder, target_path)
+
+        if not folder or not platform:
+            raise HTTPException(status_code=400, detail="Could not detect export format")
+
+        status = ImportStatus(
+            platform=platform,
+            source_path=filename,
+            status="running",
+        )
+        return import_export(
+            folder,
+            platform,
+            status=status,
+            rebuild_fts=True,
+            source_label=f"upload:{filename}",
+        )
 
 
 @router.post("/run", response_model=ImportJobResponse)
@@ -331,6 +461,7 @@ def import_export(
     status: ImportStatus | None = None,
     rebuild_fts: bool = True,
     cancel_check: Callable[[], bool] | None = None,
+    source_label: str | None = None,
 ) -> ImportStatus:
     """Import an export folder."""
     parser = get_parser(platform)
@@ -365,7 +496,7 @@ def import_export(
                 INSERT INTO imports (platform, import_date, source_path)
                 VALUES (?, ?, ?)
                 """,
-                (platform, datetime.now().isoformat(), str(folder)),
+                (platform, datetime.now().isoformat(), source_label or str(folder)),
             )
             import_id = cursor.lastrowid
 

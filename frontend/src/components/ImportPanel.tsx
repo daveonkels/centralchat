@@ -1,9 +1,10 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, ChangeEvent } from 'react';
 import {
   scanImports,
   runImport,
   getImportStatus,
   cancelImport,
+  uploadImport,
   purgePlatforms,
   getStats,
   DetectedExport,
@@ -32,6 +33,11 @@ function ImportPanel({ onImportComplete }: ImportPanelProps) {
   const [purgeResults, setPurgeResults] = useState<PurgeResult[]>([]);
   const [purgeError, setPurgeError] = useState<string | null>(null);
   const [purging, setPurging] = useState(false);
+  const [uploadFile, setUploadFile] = useState<File | null>(null);
+  const [uploading, setUploading] = useState(false);
+  const [uploadResult, setUploadResult] = useState<ImportStatus | null>(null);
+  const [uploadError, setUploadError] = useState<string | null>(null);
+  const [uploadInputKey, setUploadInputKey] = useState(0);
   const [jobId, setJobId] = useState<string | null>(null);
   const [jobCompleted, setJobCompleted] = useState(false);
   const [jobCanceled, setJobCanceled] = useState(false);
@@ -61,6 +67,8 @@ function ImportPanel({ onImportComplete }: ImportPanelProps) {
     setJobCanceled(false);
     setCanceling(false);
     setPurgeError(null);
+    setUploadError(null);
+    setUploadResult(null);
 
     try {
       const response = await runImport();
@@ -126,6 +134,32 @@ function ImportPanel({ onImportComplete }: ImportPanelProps) {
     }
   };
 
+  const handleUpload = async () => {
+    if (!uploadFile || uploading) return;
+    setUploading(true);
+    setUploadError(null);
+    setUploadResult(null);
+    try {
+      const response = await uploadImport(uploadFile);
+      setUploadResult(response);
+      setUploadFile(null);
+      setUploadInputKey((prev) => prev + 1);
+      onImportComplete();
+      refreshStats();
+    } catch (err) {
+      setUploadError(err instanceof Error ? err.message : 'Upload failed');
+    } finally {
+      setUploading(false);
+    }
+  };
+
+  const handleUploadChange = (event: ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0] || null;
+    setUploadFile(file);
+    setUploadResult(null);
+    setUploadError(null);
+  };
+
   const selectedPlatforms = PLATFORM_OPTIONS
     .filter((platform) => purgeSelection[platform.id])
     .map((platform) => platform.id);
@@ -176,6 +210,62 @@ function ImportPanel({ onImportComplete }: ImportPanelProps) {
         Data stays local in <code>data/central-chat.db</code>. "New" counts only previously imported conversations.
       </p>
 
+      <div className="upload-section">
+        <h3 style={{ marginBottom: '8px' }}>Upload Export</h3>
+        <p className="import-note">
+          Upload a <code>.zip</code> or <code>.json</code> export file directly from your computer.
+        </p>
+        <div className="upload-controls">
+          <input
+            key={uploadInputKey}
+            className="upload-input"
+            type="file"
+            accept=".zip,.json,application/zip,application/json"
+            onChange={handleUploadChange}
+            disabled={uploading || importing || purging}
+          />
+          <button
+            className="upload-btn"
+            onClick={handleUpload}
+            disabled={!uploadFile || uploading || importing || purging}
+            type="button"
+          >
+            {uploading ? 'Uploading...' : 'Upload & Import'}
+          </button>
+        </div>
+        {uploadFile && (
+          <div className="upload-file">
+            Selected: <strong>{uploadFile.name}</strong>
+          </div>
+        )}
+        {(importing || purging) && (
+          <div className="upload-hint">Pause other operations before uploading.</div>
+        )}
+        {uploadError && (
+          <div className="import-status error">
+            Error: {uploadError}
+          </div>
+        )}
+        {uploadResult && (
+          <div className={`import-status ${uploadResult.status === 'completed' ? 'success' : uploadResult.status === 'error' ? 'error' : ''}`}>
+            <strong>{uploadResult.platform}</strong> ({uploadResult.source_path}): {uploadResult.status}
+            {uploadResult.status !== 'error' && (
+              <>
+                {' '}
+                - {uploadResult.conversations_imported} conversations, {uploadResult.messages_imported} messages
+              </>
+            )}
+            {uploadResult.errors.length > 0 && (
+              <ul>
+                {uploadResult.errors.map((err, i) => (
+                  <li key={i}>{err}</li>
+                ))}
+              </ul>
+            )}
+          </div>
+        )}
+      </div>
+
       <div className="export-guides">
         <div className="export-guides-title">Export guides</div>
         <div className="export-guides-list">
@@ -222,7 +312,7 @@ function ImportPanel({ onImportComplete }: ImportPanelProps) {
       ) : (
         <>
           <p style={{ color: 'var(--text-secondary)', marginBottom: '12px' }}>
-            Detected {exports.length} export{exports.length !== 1 ? 's' : ''}:
+            Detected {exports.length} data file{exports.length !== 1 ? 's' : ''}:
           </p>
           <ul style={{ marginBottom: '16px', paddingLeft: '20px' }}>
             {exports.map((exp) => (
