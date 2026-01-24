@@ -358,9 +358,6 @@ function ConversationList({
                   <PlatformBadge platform={conv.platform} />
                   <span>{conv.title || 'Untitled'}</span>
                 </div>
-                {conv.summary && (
-                  <div className="result-snippet">{cleanContent(conv.summary)}</div>
-                )}
                 <div className="result-meta">
                   {conv.message_count !== undefined && (
                     <span>{conv.message_count} messages</span>

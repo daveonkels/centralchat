@@ -398,7 +398,7 @@ function ImportPanel({ onImportComplete }: ImportPanelProps) {
 
         <div className="purge-options">
           {PLATFORM_OPTIONS.map((platform) => {
-            const count = stats?.by_platform?.[platform.id];
+            const count = stats ? (stats.by_platform?.[platform.id] ?? 0) : null;
             const countLabel = typeof count === 'number'
               ? `${count.toLocaleString()} conversations`
               : 'Loading...';

@@ -300,7 +300,7 @@ function App() {
             <>
               {stats.last_imported && (
                 <span className="last-imported">
-                  Imported {formatLastImported(stats.last_imported)}
+                  Last import on {formatLastImported(stats.last_imported)}
                 </span>
               )}
               <span>{stats.total_conversations.toLocaleString()} conversations</span>
@@ -309,7 +309,7 @@ function App() {
                 className="filter-btn"
                 onClick={() => setShowImport(!showImport)}
               >
-                {showImport ? 'Hide Import' : 'Import'}
+                {showImport ? 'Hide Import' : 'Import/Export'}
               </button>
             </>
           )}
