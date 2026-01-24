@@ -1,6 +1,7 @@
 import { useRef, useCallback, useEffect, useState } from 'react';
 import { useVirtualizer } from '@tanstack/react-virtual';
 import { SearchResult, Conversation } from '../api/client';
+import { PlatformIcon } from './PlatformIcons';
 
 interface ConversationListProps {
   results: SearchResult[];
@@ -85,6 +86,7 @@ function getPlatformDisplayName(platform: string): string {
 function PlatformBadge({ platform }: { platform: string }) {
   return (
     <span className={`platform-badge ${platform}`}>
+      <PlatformIcon platform={platform} size={12} />
       {getPlatformDisplayName(platform)}
     </span>
   );

@@ -12,6 +12,7 @@ import {
   PurgeResult,
   Stats,
 } from '../api/client';
+import { PlatformIcon } from './PlatformIcons';
 
 interface ImportPanelProps {
   onImportComplete: () => void;
@@ -270,7 +271,10 @@ function ImportPanel({ onImportComplete }: ImportPanelProps) {
         <div className="export-guides-title">Export guides</div>
         <div className="export-guides-list">
           <div className="export-guide-card">
-            <span className="platform-badge openai">ChatGPT</span>
+            <span className="platform-badge openai">
+              <PlatformIcon platform="openai" size={12} />
+              ChatGPT
+            </span>
             <span className="export-guide-file">Expected: <code>conversations.json</code></span>
             <a
               href="https://help.openai.com/en/articles/7260999-how-do-i-export-my-chatgpt-history"
@@ -281,7 +285,10 @@ function ImportPanel({ onImportComplete }: ImportPanelProps) {
             </a>
           </div>
           <div className="export-guide-card">
-            <span className="platform-badge claude">Claude</span>
+            <span className="platform-badge claude">
+              <PlatformIcon platform="claude" size={12} />
+              Claude
+            </span>
             <span className="export-guide-file">Expected: <code>conversations.json</code></span>
             <a
               href="https://support.anthropic.com/en/articles/8325615-how-do-i-export-my-data-from-claude"
@@ -292,7 +299,10 @@ function ImportPanel({ onImportComplete }: ImportPanelProps) {
             </a>
           </div>
           <div className="export-guide-card">
-            <span className="platform-badge raycast">Raycast</span>
+            <span className="platform-badge raycast">
+              <PlatformIcon platform="raycast" size={12} />
+              Raycast
+            </span>
             <span className="export-guide-file">Expected: <code>raycast_ai_chats.json</code></span>
             <a
               href="https://www.raycast.com/manual/exporting-data"
@@ -317,7 +327,10 @@ function ImportPanel({ onImportComplete }: ImportPanelProps) {
           <ul style={{ marginBottom: '16px', paddingLeft: '20px' }}>
             {exports.map((exp) => (
               <li key={exp.path} style={{ color: 'var(--text-secondary)' }}>
-                <span className={`platform-badge ${exp.platform}`}>{exp.platform}</span>
+                <span className={`platform-badge ${exp.platform}`}>
+                  <PlatformIcon platform={exp.platform} size={12} />
+                  {exp.platform}
+                </span>
                 {' '}{exp.name}
               </li>
             ))}
@@ -414,7 +427,10 @@ function ImportPanel({ onImportComplete }: ImportPanelProps) {
                   }))}
                   disabled={purging || importing}
                 />
-                <span className={`platform-badge ${platform.id}`}>{platform.label}</span>
+                <span className={`platform-badge ${platform.id}`}>
+                  <PlatformIcon platform={platform.id} size={12} />
+                  {platform.label}
+                </span>
                 <span className="purge-count">{countLabel}</span>
               </label>
             );

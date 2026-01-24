@@ -1,4 +1,5 @@
 import { Stats } from '../api/client';
+import { PlatformIcon } from './PlatformIcons';
 
 interface FiltersProps {
   stats: Stats | null;
@@ -48,6 +49,9 @@ function Filters({ stats, selectedPlatform, onPlatformChange }: FiltersProps) {
             onClick={() => onPlatformChange(platform)}
             data-platform={platform}
           >
+            <span className={`platform-icon ${platform}`}>
+              <PlatformIcon platform={platform} size={14} />
+            </span>
             {getPlatformDisplayName(platform)}
             <span className="filter-count">{formatCount(count)}</span>
           </button>

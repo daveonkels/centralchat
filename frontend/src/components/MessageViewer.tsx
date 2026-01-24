@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { Conversation } from '../api/client';
+import { PlatformIcon } from './PlatformIcons';
 import hljs from 'highlight.js/lib/core';
 import javascript from 'highlight.js/lib/languages/javascript';
 import typescript from 'highlight.js/lib/languages/typescript';
@@ -281,6 +282,7 @@ function MessageViewer({ conversation }: MessageViewerProps) {
         </h2>
         <div className="conversation-meta">
           <span className={`platform-badge ${platform}`}>
+            <PlatformIcon platform={platform} size={12} />
             {getPlatformDisplayName(platform)}
           </span>
           <span>{formatDate(conversation.created_at)}</span>
