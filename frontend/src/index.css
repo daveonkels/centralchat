@@ -1599,6 +1599,7 @@ header h1::after {
 
 .import-section {
   margin-top: var(--space-6);
+  margin-bottom: var(--space-6);
   padding: var(--space-5);
   background: var(--bg-secondary);
   border-radius: var(--radius-lg);
