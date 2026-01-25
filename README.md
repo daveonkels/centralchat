@@ -4,7 +4,7 @@
 
 **Website:** [centralchat.fyi](https://centralchat.fyi)
 
-<!-- Add a screenshot here: ![Central Chat](docs/screenshots/main.png) -->
+![Central Chat](docs/screenshots/centralchat-desktop-01.jpeg)
 
 ## Why?
 
@@ -58,12 +58,11 @@ Open [http://localhost:3000](http://localhost:3000)
 
 That's it! Your conversations are now searchable.
 
-<!--
 ## Screenshots
 
-![Search interface](docs/screenshots/search.png)
-![Conversation view](docs/screenshots/conversation.png)
--->
+![Conversation view](docs/screenshots/centralchat-desktop-02.jpeg)
+
+![Mobile view](docs/screenshots/centralchat-mobile-01.jpeg)
 
 ## Searching
 
