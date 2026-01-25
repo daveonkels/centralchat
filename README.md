@@ -1,69 +1,130 @@
 # Central Chat Archive
 
-A local web application to search across your AI chat history from ChatGPT, Claude, and Raycast.
+> Search across all your AI conversations in one place. Local-first, privacy-focused.
+
+<!-- Add a screenshot here: ![Central Chat Archive](docs/screenshots/main.png) -->
+
+## Why?
+
+Your AI conversations are scattered across ChatGPT, Claude, and Raycast. Each platform has its own interface, its own search, and its own data export format.
+
+Central Chat Archive brings them together in a single, fast, searchable interface that runs entirely on your machine. **Your data never leaves your computer.**
 
 ## Features
 
-- **Full-text search** across all conversations and messages with SQLite FTS5
-- **Platform-specific theming** - Claude (amber), ChatGPT (teal), and Raycast (rose) each have distinct color accents
-- **Deep linking** - each conversation has a shareable URL (`/c/{id}`)
-- **Syntax highlighting** for code blocks with one-click copy
-- **Copy message button** - hover any message to copy its content
-- **Virtualized lists** - smooth scrolling with thousands of conversations
-- **Last imported date** - track when data was last updated
-- **Keyboard shortcuts** - `Cmd+K` to focus search
+- **Unified search** across all platforms with SQLite FTS5
+- **Platform theming** — Claude (amber), ChatGPT (teal), Raycast (rose)
+- **Privacy-first** — all data stays local in a SQLite database
+- **Safe re-imports** — duplicates are automatically skipped
+- **Deep linking** — shareable URLs for each conversation
+- **Keyboard-driven** — `Cmd+K` to search, `↑↓` to navigate, `?` for help
+- **Syntax highlighting** — code blocks with one-click copy
+- **Markdown rendering** — proper formatting for lists, headings, and more
 
-## Quick Start (Local)
+## Quick Start
 
-### Using Docker Compose
+### Prerequisites
+
+- **Docker** (recommended), OR
+- Python 3.10+ and Node.js 18+
+
+### Step 1: Get Your Data
+
+Export your chat history from each platform you use:
+
+| Platform | How to Export |
+|----------|---------------|
+| **ChatGPT** | [chat.openai.com](https://chat.openai.com) → Settings → Data Controls → Export → Download ZIP |
+| **Claude** | [claude.ai/settings](https://claude.ai/settings) → Export Data → Download ZIP |
+| **Raycast** | Raycast app → AI Chat → `...` menu → Export History |
+
+### Step 2: Run the App
 
 ```bash
-# Build and start
+git clone https://github.com/yourusername/central-chat.git
+cd central-chat
 docker compose up -d
-
-# Open in browser
-open http://localhost:3000
 ```
 
-Note: Docker Compose binds to `127.0.0.1` by default for local-only access. If you want to expose it on your network, change the port mappings in `docker-compose.yml` and add authentication at the proxy.
+Open [http://localhost:3000](http://localhost:3000)
 
-### Manual Setup
+### Step 3: Import Your Data
 
-**Backend (requires Python 3.10-3.12):**
+1. Click **Manage Data** in the header
+2. Upload your exported ZIP or JSON files
+3. Click **Upload & Import**
+
+That's it! Your conversations are now searchable.
+
+<!--
+## Screenshots
+
+![Search interface](docs/screenshots/search.png)
+![Conversation view](docs/screenshots/conversation.png)
+-->
+
+## Searching
+
+- Type to search across all messages and conversation titles
+- Filter by platform using the filter buttons
+- Click a result to view the full conversation
+
+**Search operators:**
+- `platform:claude` — filter by platform (claude, openai, raycast)
+- `role:user` — filter by message role (user, assistant)
+- `before:2024-01-01` — messages before a date
+
+**Keyboard shortcuts:** Press `?` to see all shortcuts
+
+## Tech Stack
+
+| Layer | Technology |
+|-------|------------|
+| Frontend | React, TypeScript, Vite |
+| Backend | Python, FastAPI |
+| Database | SQLite with FTS5 full-text search |
+| Deployment | Docker, nginx |
+
+## Advanced Setup
+
+<details>
+<summary><strong>Manual Setup (without Docker)</strong></summary>
+
+### Backend
+
 ```bash
 cd backend
 python3 -m venv .venv
 source .venv/bin/activate
 pip install -r requirements.txt
 
-# Set environment variables
 export DATABASE_PATH=../data/central-chat.db
 export IMPORTS_PATH=../imports
 
-# Run
 uvicorn app.main:app --reload --port 8000
 ```
 
-**Frontend:**
+### Frontend
+
 ```bash
 cd frontend
 npm install
 npm run dev
 ```
 
-## Server Deployment (Traefik)
+</details>
+
+<details>
+<summary><strong>Server Deployment (Traefik)</strong></summary>
 
 For deployment to a server with an existing Traefik + Docker Compose setup:
 
 ### 1. Copy project and build images
 
 ```bash
-# Copy to server
-rsync -avz --exclude 'imports/*/' --exclude 'node_modules' --exclude '.venv' \
-  --exclude 'data/*.db' --exclude '.git' \
+rsync -avz --exclude 'node_modules' --exclude '.venv' --exclude 'data/*.db' --exclude '.git' \
   ./ yourserver:~/apps/central-chat/
 
-# SSH to server and build images
 ssh yourserver
 cd ~/apps/central-chat
 docker build -t central-chat-backend:latest ./backend
@@ -76,46 +137,37 @@ docker build -t central-chat-frontend:latest ./frontend
 mkdir -p ~/data/central-chat/imports
 ```
 
-### 3. Add to existing docker-compose.yml
-
-Add these services to your main `docker-compose.yml`:
+### 3. Add to your docker-compose.yml
 
 ```yaml
-## CENTRAL-CHAT (AI Chat Archive)
-  central-chat-backend:
-    image: central-chat-backend:latest
-    container_name: central-chat-backend
-    restart: unless-stopped
-    volumes:
-      - /home/cooper/data/central-chat:/app/data
-      - /home/cooper/data/central-chat/imports:/app/imports:ro
-    environment:
-      - DATABASE_PATH=/app/data/central-chat.db
-      - IMPORTS_PATH=/app/imports
-    networks:
-      - proxy
+central-chat-backend:
+  image: central-chat-backend:latest
+  container_name: central-chat-backend
+  restart: unless-stopped
+  volumes:
+    - ~/data/central-chat:/app/data
+    - ~/data/central-chat/imports:/app/imports:ro
+  environment:
+    - DATABASE_PATH=/app/data/central-chat.db
+    - IMPORTS_PATH=/app/imports
+  networks:
+    - proxy
 
-  central-chat-frontend:
-    image: central-chat-frontend:latest
-    container_name: central-chat-frontend
-    restart: unless-stopped
-    depends_on:
-      - central-chat-backend
-    networks:
-      - proxy
-    labels:
-      - "traefik.enable=true"
-      - "traefik.http.routers.central-chat.entrypoints=http"
-      - "traefik.http.routers.central-chat.rule=Host(`central-chat.example.com`)"
-      - "traefik.http.middlewares.central-chat-https-redirect.redirectscheme.scheme=https"
-      - "traefik.http.routers.central-chat.middlewares=central-chat-https-redirect"
-      - "traefik.http.routers.central-chat-secure.entrypoints=https"
-      - "traefik.http.routers.central-chat-secure.rule=Host(`central-chat.example.com`)"
-      - "traefik.http.routers.central-chat-secure.tls=true"
-      - "traefik.http.routers.central-chat-secure.service=central-chat"
-      - "traefik.http.services.central-chat.loadbalancer.server.port=80"
-      - "traefik.docker.network=proxy"
-## END
+central-chat-frontend:
+  image: central-chat-frontend:latest
+  container_name: central-chat-frontend
+  restart: unless-stopped
+  depends_on:
+    - central-chat-backend
+  networks:
+    - proxy
+  labels:
+    - "traefik.enable=true"
+    - "traefik.http.routers.central-chat.rule=Host(`central-chat.example.com`)"
+    - "traefik.http.routers.central-chat.entrypoints=https"
+    - "traefik.http.routers.central-chat.tls=true"
+    - "traefik.http.services.central-chat.loadbalancer.server.port=80"
+    - "traefik.docker.network=proxy"
 ```
 
 ### 4. Start services
@@ -124,82 +176,32 @@ Add these services to your main `docker-compose.yml`:
 docker compose up -d central-chat-backend central-chat-frontend
 ```
 
-### 5. Upload exports and import
+</details>
 
-```bash
-# From local machine, upload exports
-rsync -avz imports/claude-*/ yourserver:~/data/central-chat/imports/claude-export/
-rsync -avz imports/openai-*/ yourserver:~/data/central-chat/imports/openai-export/
-rsync -avz imports/raycast-*/ yourserver:~/data/central-chat/imports/raycast-export/
+## Data Storage
 
-# Trigger import via API
-curl -X POST https://central-chat.example.com/api/import/run
-```
-
-## Usage
-
-### Importing Chats
-
-1. Place your export folders in the `imports/` directory:
-   - **Claude**: Export from claude.ai Settings > Export Data
-   - **ChatGPT**: Export from OpenAI Settings > Data Controls > Export
-   - **Raycast**: Export from Raycast AI Chat History
-
-2. Open the web UI
-
-3. Click "Import" and then "Run Import"
-
-### Searching
-
-- Type in the search box to search across all messages and conversation titles
-- Use platform filters to narrow results
-- Click on a result to view the full conversation
-- Search operators:
-  - `platform:openai`, `platform:claude`, `platform:raycast`
-  - `role:user`, `role:assistant`, `from:assistant`
-  - `before:YYYY-MM-DD`
-
-### Data Storage
-
-- Database is stored locally at `data/central-chat.db`
-
-## Project Structure
-
-```
-central-chat/
-├── docker-compose.yml      # Local dev: docker compose up
-├── backend/
-│   ├── app/
-│   │   ├── main.py         # FastAPI app
-│   │   ├── database.py     # SQLite + FTS5
-│   │   ├── models.py       # Pydantic models
-│   │   ├── routers/        # API endpoints
-│   │   └── parsers/        # Platform-specific parsers
-│   └── Dockerfile
-├── frontend/
-│   ├── src/
-│   │   ├── App.tsx         # Main React component
-│   │   ├── components/     # UI components
-│   │   └── api/            # API client
-│   ├── nginx.conf          # Proxies /api to backend
-│   └── Dockerfile
-├── data/                   # SQLite database (auto-created)
-└── imports/                # Drop export folders here
-```
+- **Database:** `data/central-chat.db`
+- **Imports:** `imports/` directory
+- Safe to delete the database and re-import at any time
 
 ## Supported Export Formats
 
-| Platform | Files Required | Notes |
+| Platform | Expected File | Notes |
 |----------|---------------|-------|
-| Claude | `conversations.json` | Full message history with timestamps |
-| ChatGPT | `conversations.json` | Tree-based messages, includes media refs |
-| Raycast | `raycast_ai_chats.json` | Simple format, no per-message timestamps |
+| ChatGPT | `conversations.json` | Full history with message tree structure |
+| Claude | `conversations.json` | Full history with timestamps |
+| Raycast | `raycast_ai_chats.json` | Simple format (no per-message timestamps) |
 
-## API Endpoints
+## API
 
-- `GET /api/search?q=query` - Full-text search
-- `GET /api/conversations` - List all conversations
-- `GET /api/conversations/{id}` - Get conversation with messages
-- `GET /api/conversations/stats` - Database statistics
-- `GET /api/import/scan` - Detect export folders
-- `POST /api/import/run` - Run import for all detected exports
+| Endpoint | Description |
+|----------|-------------|
+| `GET /api/search?q=query` | Full-text search |
+| `GET /api/conversations` | List conversations |
+| `GET /api/conversations/{id}` | Get conversation with messages |
+| `GET /api/conversations/stats` | Database statistics |
+| `POST /api/import/run` | Trigger import |
+
+## License
+
+MIT
