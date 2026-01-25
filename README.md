@@ -1,14 +1,13 @@
-# Central Chat
+# Central Chat - Because that brilliant explanation ChatGPT or Claude gave you three months ago shouldn't be lost forever.
 
-> Because that brilliant explanation ChatGPT or Claude gave you three months ago shouldn't be lost forever. Grab your data archives and get one search bar for everything. Every AI conversation. Zero cloud dependencies.
+![Central Chat](docs/centralchat-hero.png)
 
-![Central Chat](docs/screenshots/centralchat-desktop-01.jpeg)
+[![License](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
+[![Docker](https://img.shields.io/badge/Docker-Ready-2496ED?logo=docker&logoColor=white)](https://docs.docker.com/get-docker/)
+[![Python](https://img.shields.io/badge/Python-3.10+-3776AB?logo=python&logoColor=white)](https://www.python.org/)
+[![TypeScript](https://img.shields.io/badge/TypeScript-5.0+-3178C6?logo=typescript&logoColor=white)](https://www.typescriptlang.org/)
 
-## Why?
-
-Your AI conversations are scattered across ChatGPT, Claude, and Raycast. Each platform has its own interface, its own search, and its own data export format.
-
-Central Chat brings them together in a single, fast, searchable interface that runs entirely on your machine. **Your data never leaves your computer.**
+Grab your data archives and get one search bar for everything. Every AI conversation. Zero cloud dependencies. Your conversations are scattered across ChatGPT, Claude, and Raycast—Central Chat brings them together in a single, fast, searchable interface that runs entirely on your machine. **Your data never leaves your computer.**
 
 ## Features
 
@@ -55,12 +54,6 @@ Open [http://localhost:3000](http://localhost:3000)
 3. Click **Upload & Import**
 
 That's it! Your conversations are now searchable.
-
-## Screenshots
-
-![Conversation view](docs/screenshots/centralchat-desktop-02.jpeg)
-
-<img src="docs/screenshots/centralchat-mobile-01.jpeg" alt="Mobile view" width="400">
 
 ## Searching
 
