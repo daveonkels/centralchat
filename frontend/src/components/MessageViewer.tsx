@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
+import ReactMarkdown from 'react-markdown';
 import { Conversation } from '../api/client';
 import { PlatformIcon } from './PlatformIcons';
 import hljs from 'highlight.js/lib/core';
@@ -150,74 +151,54 @@ function cleanContent(text: string): string {
     .trim();
 }
 
-// Parse and render message content with code blocks
+// Normalize common bullet patterns to markdown
+function normalizeToMarkdown(text: string): string {
+  return text
+    // Convert tab-indented bullets (▪, •, -, *) to markdown list items
+    .replace(/^[ \t]*[▪•]\t*/gm, '- ')
+    .replace(/^[ \t]*[-*]\t+/gm, '- ')
+    // Convert numbered lists with tabs to markdown (1.\t -> 1. )
+    .replace(/^[ \t]*(\d+\.)\t+/gm, '$1 ')
+    // Normalize multiple spaces/tabs after list markers
+    .replace(/^(- |\d+\. )[ \t]+/gm, '$1');
+}
+
+// Parse and render message content with markdown support
 function MessageContent({ content }: { content: string }) {
-  // Clean the content first
-  content = cleanContent(content);
-  // Split content into parts: regular text and code blocks
-  const parts: Array<{ type: 'text' | 'code'; content: string; language?: string }> = [];
-
-  // Match code blocks: ```language\ncode\n```
-  const codeBlockRegex = /```(\w*)\n([\s\S]*?)```/g;
-  let lastIndex = 0;
-  let match;
-
-  while ((match = codeBlockRegex.exec(content)) !== null) {
-    // Add text before this code block
-    if (match.index > lastIndex) {
-      parts.push({
-        type: 'text',
-        content: content.slice(lastIndex, match.index),
-      });
-    }
-
-    // Add the code block
-    parts.push({
-      type: 'code',
-      content: match[2].trim(),
-      language: match[1] || undefined,
-    });
-
-    lastIndex = match.index + match[0].length;
-  }
-
-  // Add remaining text
-  if (lastIndex < content.length) {
-    parts.push({
-      type: 'text',
-      content: content.slice(lastIndex),
-    });
-  }
-
-  // If no code blocks found, just render as text
-  if (parts.length === 0) {
-    return <div className="message-content">{content}</div>;
-  }
+  // Clean the content first (remove citation markers etc.)
+  const cleaned = cleanContent(content);
+  // Normalize bullet patterns to standard markdown
+  const normalized = normalizeToMarkdown(cleaned);
 
   return (
     <div className="message-content">
-      {parts.map((part, index) => {
-        if (part.type === 'code') {
-          return (
-            <CodeBlock
-              key={index}
-              code={part.content}
-              language={part.language}
-            />
-          );
-        }
-        // Render text, handling inline code
-        return (
-          <span key={index}>
-            {part.content.split(/(`[^`]+`)/).map((segment, segIndex) => {
-              if (segment.startsWith('`') && segment.endsWith('`')) {
-                return <code key={segIndex}>{segment.slice(1, -1)}</code>;
-              }
-              return segment;
-            })}
-          </span>
-        );
-      })}
+      <ReactMarkdown
+        components={{
+          // Use our custom CodeBlock for fenced code blocks
+          code({ className, children, ...props }) {
+            const match = /language-(\w+)/.exec(className || '');
+            const isBlock = props.node?.position?.start.line !== props.node?.position?.end.line ||
+              String(children).includes('\n');
+
+            if (isBlock || match) {
+              return (
+                <CodeBlock
+                  code={String(children).replace(/\n$/, '')}
+                  language={match?.[1]}
+                />
+              );
+            }
+            // Inline code
+            return <code className={className} {...props}>{children}</code>;
+          },
+          // Remove the wrapping <pre> since CodeBlock handles it
+          pre({ children }) {
+            return <>{children}</>;
+          },
+        }}
+      >
+        {normalized}
+      </ReactMarkdown>
     </div>
   );
 }
