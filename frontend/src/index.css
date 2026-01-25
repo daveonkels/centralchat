@@ -737,6 +737,12 @@ header h1::after {
   font-variant-numeric: tabular-nums;
 }
 
+.results-loading-more {
+  margin-left: auto;
+  font-size: var(--text-xs);
+  color: var(--text-muted);
+}
+
 .results-scroll {
   flex: 1;
   overflow-y: auto;

@@ -13,6 +13,9 @@ interface ConversationListProps {
   isSearchMode: boolean;
   suggestions?: string[];
   onSuggestionSelect?: (value: string) => void;
+  hasMore?: boolean;
+  loadingMore?: boolean;
+  onLoadMore?: () => void;
 }
 
 const HIGHLIGHT_START = '__CC_HL_START__';
@@ -132,6 +135,9 @@ function ConversationList({
   isSearchMode,
   suggestions = [],
   onSuggestionSelect,
+  hasMore = false,
+  loadingMore = false,
+  onLoadMore,
 }: ConversationListProps) {
   const parentRef = useRef<HTMLDivElement>(null);
   const [animatedItems, setAnimatedItems] = useState<Set<string>>(new Set());
@@ -165,6 +171,17 @@ function ConversationList({
     }, [isSearchMode, results]),
     overscan: 5,
   });
+
+  const virtualItems = virtualizer.getVirtualItems();
+
+  useEffect(() => {
+    if (isSearchMode || !onLoadMore || !hasMore || loadingMore) return;
+    if (virtualItems.length === 0) return;
+    const lastItem = virtualItems[virtualItems.length - 1];
+    if (lastItem.index >= items.length - 6) {
+      onLoadMore();
+    }
+  }, [hasMore, isSearchMode, items.length, loadingMore, onLoadMore, virtualItems]);
 
   useEffect(() => {
     if (
@@ -244,7 +261,7 @@ function ConversationList({
             className="results-virtual"
             style={{ height: `${virtualizer.getTotalSize()}px` }}
           >
-            {virtualizer.getVirtualItems().map((virtualRow) => {
+            {virtualItems.map((virtualRow) => {
               const result = results[virtualRow.index];
               const key = getItemKey(result, virtualRow.index);
               const isAnimated = animatedItems.has(key);
@@ -321,14 +338,16 @@ function ConversationList({
   return (
     <div className="results-list">
       <div className="results-header">
-        <strong>{conversations.length}</strong> conversation{conversations.length !== 1 ? 's' : ''}
+        <strong>{hasMore ? `${conversations.length}+` : conversations.length}</strong>{' '}
+        conversation{conversations.length !== 1 ? 's' : ''}
+        {loadingMore && <span className="results-loading-more">Loading more...</span>}
       </div>
       <div ref={parentRef} className="results-scroll">
         <div
           className="results-virtual"
           style={{ height: `${virtualizer.getTotalSize()}px` }}
         >
-          {virtualizer.getVirtualItems().map((virtualRow) => {
+          {virtualItems.map((virtualRow) => {
             const conv = conversations[virtualRow.index];
             const key = getItemKey(conv, virtualRow.index);
             const isAnimated = animatedItems.has(key);

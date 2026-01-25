@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import { MdSettings, MdClose } from 'react-icons/md';
 import SearchBar from './components/SearchBar';
 import Filters from './components/Filters';
@@ -19,6 +19,7 @@ import { parseSearchInput, buildSearchSuggestions } from './utils/search';
 const MATCH_ALL_QUERY = '__cc_match_all__';
 const RECENT_STORAGE_KEY = 'central-chat.recent-searches';
 const MAX_RECENT = 6;
+const CONVERSATION_PAGE_SIZE = 50;
 
 function formatLastImported(dateStr: string | null): string {
   if (!dateStr) return '';
@@ -55,12 +56,20 @@ function App() {
   const [selectedIndex, setSelectedIndex] = useState<number | null>(null);
   const [stats, setStats] = useState<Stats | null>(null);
   const [platform, setPlatform] = useState<string | null>(null);
-  const [loading, setLoading] = useState(false);
+  const [searchLoading, setSearchLoading] = useState(false);
+  const [listLoading, setListLoading] = useState(false);
+  const [listLoadingMore, setListLoadingMore] = useState(false);
+  const [hasMoreConversations, setHasMoreConversations] = useState(true);
   const [showImport, setShowImport] = useState(false);
   const [recentSearches, setRecentSearches] = useState<string[]>([]);
   const [showHelp, setShowHelp] = useState(false);
   const [searchError, setSearchError] = useState<string | null>(null);
   const isMac = typeof navigator !== 'undefined' && /Mac|iPod|iPhone|iPad/.test(navigator.platform);
+  const conversationOffsetRef = useRef(0);
+  const hasMoreRef = useRef(true);
+  const listLoadingRef = useRef(false);
+  const listLoadingMoreRef = useRef(false);
+  const listRequestIdRef = useRef(0);
 
   // Load stats on mount
   useEffect(() => {
@@ -117,16 +126,72 @@ function App() {
     return () => window.removeEventListener('popstate', handlePopState);
   }, []);
 
-  // Load conversations when no search query
-  useEffect(() => {
-    if (!query) {
-      setLoading(true);
-      listConversations({ platform: platform || undefined, limit: 100 })
-        .then(setConversations)
-        .catch(console.error)
-        .finally(() => setLoading(false));
+  const loadConversations = useCallback(async (reset: boolean) => {
+    if (query) return;
+    if (!reset && (listLoadingRef.current || listLoadingMoreRef.current)) return;
+    if (!reset && !hasMoreRef.current) return;
+
+    const offset = reset ? 0 : conversationOffsetRef.current;
+    const requestId = reset ? listRequestIdRef.current + 1 : listRequestIdRef.current;
+    if (reset) {
+      listRequestIdRef.current = requestId;
+    }
+
+    if (reset) {
+      listLoadingRef.current = true;
+      setListLoading(true);
+    } else {
+      listLoadingMoreRef.current = true;
+      setListLoadingMore(true);
+    }
+
+    try {
+      const data = await listConversations({
+        platform: platform || undefined,
+        limit: CONVERSATION_PAGE_SIZE,
+        offset,
+      });
+      if (requestId !== listRequestIdRef.current) return;
+      setConversations((prev) => (reset ? data : [...prev, ...data]));
+      conversationOffsetRef.current = offset + data.length;
+      const more = data.length === CONVERSATION_PAGE_SIZE;
+      hasMoreRef.current = more;
+      setHasMoreConversations(more);
+    } catch (error) {
+      console.error('Failed to list conversations:', error);
+    } finally {
+      if (requestId !== listRequestIdRef.current) return;
+      if (reset) {
+        listLoadingRef.current = false;
+        setListLoading(false);
+      } else {
+        listLoadingMoreRef.current = false;
+        setListLoadingMore(false);
+      }
     }
   }, [platform, query]);
+
+  const resetConversations = useCallback(() => {
+    conversationOffsetRef.current = 0;
+    hasMoreRef.current = true;
+    setHasMoreConversations(true);
+    setConversations([]);
+    listLoadingRef.current = false;
+    listLoadingMoreRef.current = false;
+    setListLoading(false);
+    setListLoadingMore(false);
+  }, []);
+
+  const handleLoadMore = useCallback(() => {
+    loadConversations(false);
+  }, [loadConversations]);
+
+  // Load conversations when no search query
+  useEffect(() => {
+    if (query) return;
+    resetConversations();
+    loadConversations(true);
+  }, [loadConversations, query, resetConversations]);
 
   useEffect(() => {
     setSelectedIndex(null);
@@ -171,10 +236,11 @@ function App() {
     if (!q.trim()) {
       setSearchError(null);
       setResults([]);
+      setSearchLoading(false);
       return;
     }
 
-    setLoading(true);
+    setSearchLoading(true);
     try {
       const { text, platform: inlinePlatform, role, before } = parseSearchInput(q);
       const response = await search(text || MATCH_ALL_QUERY, {
@@ -191,7 +257,7 @@ function App() {
       setSearchError(error instanceof Error ? error.message : 'Search failed');
       console.error('Search error:', error);
     } finally {
-      setLoading(false);
+      setSearchLoading(false);
     }
   }, [platform, updateRecentSearches]);
 
@@ -286,9 +352,8 @@ function App() {
   const handleImportComplete = () => {
     getStats().then(setStats).catch(console.error);
     if (!query) {
-      listConversations({ platform: platform || undefined, limit: 100 })
-        .then(setConversations)
-        .catch(console.error);
+      resetConversations();
+      loadConversations(true);
     }
   };
 
@@ -417,7 +482,7 @@ function App() {
       <SearchBar
         value={searchInput}
         onChange={setSearchInput}
-        loading={loading && !!query}
+        loading={searchLoading && !!query}
         recentSearches={recentSearches}
         onSelectRecent={handleSelectRecent}
         error={searchError}
@@ -434,7 +499,10 @@ function App() {
         <ConversationList
           results={query ? results : []}
           conversations={query ? [] : conversations}
-          loading={loading}
+          loading={isSearchMode ? searchLoading : listLoading}
+          hasMore={!isSearchMode && hasMoreConversations}
+          loadingMore={!isSearchMode && listLoadingMore}
+          onLoadMore={!isSearchMode ? handleLoadMore : undefined}
           selectedId={selectedConversation?.id}
           selectedIndex={selectedIndex}
           onSelect={handleSelectFromList}
