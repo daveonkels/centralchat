@@ -3,7 +3,7 @@
    ============================================================================= */
 
 /* Font imports must come first */
-@import url('https://fonts.googleapis.com/css2?family=Doto:wght@400&family=JetBrains+Mono:wght@400;500&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Doto:wght@400&family=JetBrains+Mono:wght@400;500&family=Plus+Jakarta+Sans:wght@500;600;700&family=Nunito+Sans:opsz,wght@6..12,400;6..12,500;6..12,600&display=swap');
 
 /* =============================================================================
    CSS CUSTOM PROPERTIES
@@ -11,10 +11,10 @@
 
 :root {
   /* ===== FONTS ===== */
-  /* Using system UI fonts with Inter fallback for optimal rendering */
-  --font-display: -apple-system, BlinkMacSystemFont, 'SF Pro Display', 'Segoe UI', Roboto, sans-serif;
-  --font-body: -apple-system, BlinkMacSystemFont, 'SF Pro Text', 'Segoe UI', Roboto, sans-serif;
-  --font-mono: 'JetBrains Mono', 'SF Mono', 'Fira Code', 'Cascadia Code', monospace;
+  /* Plus Jakarta Sans for display, Nunito Sans for body - warm, readable, elegant */
+  --font-display: 'Plus Jakarta Sans', -apple-system, BlinkMacSystemFont, sans-serif;
+  --font-body: 'Nunito Sans', -apple-system, BlinkMacSystemFont, sans-serif;
+  --font-mono: 'JetBrains Mono', 'SF Mono', 'Fira Code', monospace;
   --font-logo: 'Doto', monospace;
 
   /* ===== TYPOGRAPHY SCALE ===== */
@@ -603,7 +603,7 @@ header h1::after {
   align-items: center;
   gap: var(--space-2);
   padding: var(--space-2) var(--space-4);
-  font-family: var(--font-body);
+  font-family: var(--font-display);
   font-size: var(--text-sm);
   font-weight: 500;
   background: var(--bg-secondary);
@@ -856,7 +856,7 @@ header h1::after {
   display: inline-flex;
   align-items: center;
   gap: var(--space-1);
-  font-family: var(--font-body);
+  font-family: var(--font-display);
   font-size: var(--text-xs);
   font-weight: 600;
   padding: 4px 10px;
@@ -1130,7 +1130,7 @@ header h1::after {
   display: flex;
   align-items: center;
   gap: var(--space-2);
-  font-family: var(--font-body);
+  font-family: var(--font-display);
   font-size: var(--text-xs);
   font-weight: 600;
   text-transform: uppercase;
@@ -1827,7 +1827,7 @@ header h1::after {
   align-items: center;
   gap: var(--space-2);
   padding: var(--space-2) var(--space-3);
-  font-family: var(--font-body);
+  font-family: var(--font-display);
   font-size: var(--text-sm);
   font-weight: 500;
   background: var(--bg-elevated);
@@ -1864,7 +1864,7 @@ header h1::after {
 .upload-btn,
 .import-btn {
   padding: var(--space-2) var(--space-4);
-  font-family: var(--font-body);
+  font-family: var(--font-display);
   font-size: var(--text-sm);
   font-weight: 500;
   background: var(--accent);
@@ -2059,7 +2059,7 @@ header h1::after {
   background: none;
   border: none;
   color: var(--error);
-  font-family: var(--font-body);
+  font-family: var(--font-display);
   font-size: var(--text-sm);
   font-weight: 600;
   text-transform: uppercase;
@@ -2122,7 +2122,7 @@ header h1::after {
 
 .purge-btn {
   padding: var(--space-2) var(--space-4);
-  font-family: var(--font-body);
+  font-family: var(--font-display);
   font-size: var(--text-sm);
   font-weight: 500;
   background: var(--error);
