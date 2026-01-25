@@ -1,8 +1,6 @@
 # Central Chat
 
-> Search across all your AI conversations in one place. Local-first, privacy-focused.
-
-**Website:** [centralchat.fyi](https://centralchat.fyi)
+> Because that brilliant explanation ChatGPT or Claude gave you three months ago shouldn't be lost forever. Grab your data archives and get one search bar for everything. Every AI conversation. Zero cloud dependencies.
 
 ![Central Chat](docs/screenshots/centralchat-desktop-01.jpeg)
 
