@@ -62,7 +62,7 @@ That's it! Your conversations are now searchable.
 
 ![Conversation view](docs/screenshots/centralchat-desktop-02.jpeg)
 
-![Mobile view](docs/screenshots/centralchat-mobile-01.jpeg)
+<img src="docs/screenshots/centralchat-mobile-01.jpeg" alt="Mobile view" width="400">
 
 ## Searching
 
