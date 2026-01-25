@@ -133,14 +133,6 @@ function SearchBar({
       </div>
 
       <div className="search-extras">
-        <div className="search-help">
-          <span className="search-help-label">Operators:</span>
-          <code>platform:openai</code>
-          <code>role:user</code>
-          <code>from:assistant</code>
-          <code>before:2024-01-01</code>
-        </div>
-
         {recentSearches.length > 0 && (
           <div className="search-recents">
             <span className="search-recents-label">Recent</span>

@@ -1,5 +1,5 @@
-import { useState, useEffect, ChangeEvent } from 'react';
-import { MdUpload, MdFolder, MdWarning } from 'react-icons/md';
+import { useState, useEffect, useRef, ChangeEvent } from 'react';
+import { MdUpload, MdFolder, MdWarning, MdFileUpload } from 'react-icons/md';
 import {
   scanImports,
   runImport,
@@ -45,6 +45,7 @@ function ImportPanel({ onImportComplete }: ImportPanelProps) {
   const [jobCanceled, setJobCanceled] = useState(false);
   const [canceling, setCanceling] = useState(false);
   const [dangerZoneOpen, setDangerZoneOpen] = useState(false);
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
     scanImports()
@@ -277,21 +278,28 @@ function ImportPanel({ onImportComplete }: ImportPanelProps) {
         <div className="import-method-card">
           <div className="import-method-title"><MdUpload /> Upload File</div>
           <div className="import-method-content">
+            <input
+              ref={fileInputRef}
+              key={uploadInputKey}
+              className="upload-input-hidden"
+              type="file"
+              accept=".zip,.json,application/zip,application/json"
+              onChange={handleUploadChange}
+              disabled={isOperating}
+            />
             <div className="upload-controls">
-              <input
-                key={uploadInputKey}
-                className="upload-input"
-                type="file"
-                accept=".zip,.json,application/zip,application/json"
-                onChange={handleUploadChange}
+              <button
+                className="browse-btn"
+                onClick={() => fileInputRef.current?.click()}
                 disabled={isOperating}
-              />
+                type="button"
+              >
+                <MdFileUpload /> Choose File
+              </button>
+              <span className="upload-filename">
+                {uploadFile ? uploadFile.name : 'No file selected'}
+              </span>
             </div>
-            {uploadFile && (
-              <div className="upload-file">
-                Selected: <strong>{uploadFile.name}</strong>
-              </div>
-            )}
             <button
               className="upload-btn"
               onClick={handleUpload}
@@ -338,7 +346,7 @@ function ImportPanel({ onImportComplete }: ImportPanelProps) {
               </div>
               <div className="export-link">
                 <PlatformIcon platform="claude" size={14} className="platform-icon claude" />
-                <a href="https://support.anthropic.com/en/articles/8325615-how-do-i-export-my-data-from-claude" target="_blank" rel="noreferrer">
+                <a href="https://support.claude.com/en/articles/9450526-how-can-i-export-my-claude-data" target="_blank" rel="noreferrer">
                   Request Claude export
                 </a>
               </div>
