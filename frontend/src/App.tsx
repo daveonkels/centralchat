@@ -360,7 +360,7 @@ function App() {
   return (
     <div className="container">
       <header>
-        <h1>Central Chat Archive</h1>
+        <h1>Central Chat</h1>
         <div className="stats">
           {stats && (
             <>

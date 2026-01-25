@@ -233,7 +233,7 @@ function ImportPanel({ onImportComplete }: ImportPanelProps) {
         </div>
         <div className="import-reassurance-item">
           <span className="check">✓</span>
-          <span>Only new conversations are added to your archive</span>
+          <span>Only new conversations are added</span>
         </div>
       </div>
 

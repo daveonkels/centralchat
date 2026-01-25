@@ -5,7 +5,7 @@ from .database import init_db
 from .routers import search, conversations, imports
 
 app = FastAPI(
-    title="Central Chat Archive",
+    title="Central Chat",
     description="Search across all your AI chat history",
     version="1.0.0",
 )

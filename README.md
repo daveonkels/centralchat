@@ -1,14 +1,16 @@
-# Central Chat Archive
+# Central Chat
 
 > Search across all your AI conversations in one place. Local-first, privacy-focused.
 
-<!-- Add a screenshot here: ![Central Chat Archive](docs/screenshots/main.png) -->
+**Website:** [centralchat.fyi](https://centralchat.fyi)
+
+<!-- Add a screenshot here: ![Central Chat](docs/screenshots/main.png) -->
 
 ## Why?
 
 Your AI conversations are scattered across ChatGPT, Claude, and Raycast. Each platform has its own interface, its own search, and its own data export format.
 
-Central Chat Archive brings them together in a single, fast, searchable interface that runs entirely on your machine. **Your data never leaves your computer.**
+Central Chat brings them together in a single, fast, searchable interface that runs entirely on your machine. **Your data never leaves your computer.**
 
 ## Features
 
