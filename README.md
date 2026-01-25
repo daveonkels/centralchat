@@ -36,7 +36,7 @@ Export your chat history from each platform you use:
 |----------|---------------|
 | **ChatGPT** | [chat.openai.com](https://chat.openai.com) → Settings → Data Controls → Export → Download ZIP |
 | **Claude** | [claude.ai/settings](https://claude.ai/settings) → Export Data → Download ZIP |
-| **Raycast** | Raycast app → AI Chat → `...` menu → Export History |
+| **Raycast** | Use [raycast-ai-exporter](https://github.com/daveonkels/raycast-ai-exporter) to export your AI chat history |
 
 ### Step 2: Run the App
 

@@ -352,7 +352,7 @@ function ImportPanel({ onImportComplete }: ImportPanelProps) {
               </div>
               <div className="export-link">
                 <PlatformIcon platform="raycast" size={14} className="platform-icon raycast" />
-                <a href="https://www.raycast.com/manual/exporting-data" target="_blank" rel="noreferrer">
+                <a href="https://github.com/daveonkels/raycast-ai-exporter" target="_blank" rel="noreferrer">
                   Export Raycast chats
                 </a>
               </div>
