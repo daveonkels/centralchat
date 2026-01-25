@@ -160,7 +160,9 @@ function normalizeToMarkdown(text: string): string {
     // Convert numbered lists with tabs to markdown (1.\t -> 1. )
     .replace(/^[ \t]*(\d+\.)\t+/gm, '$1 ')
     // Normalize multiple spaces/tabs after list markers
-    .replace(/^(- |\d+\. )[ \t]+/gm, '$1');
+    .replace(/^(- |\d+\. )[ \t]+/gm, '$1')
+    // Collapse 3+ consecutive newlines to 2 (single paragraph break)
+    .replace(/\n{3,}/g, '\n\n');
 }
 
 // Parse and render message content with markdown support
