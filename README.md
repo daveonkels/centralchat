@@ -43,7 +43,7 @@ Export your chat history from each platform you use:
 ### Step 2: Run the App
 
 ```bash
-git clone https://github.com/yourusername/central-chat.git
+git clone https://github.com/daveonkels/centralchat.git
 cd central-chat
 docker compose up -d
 ```
