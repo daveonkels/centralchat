@@ -5,6 +5,8 @@ import Filters from './components/Filters';
 import ConversationList from './components/ConversationList';
 import MessageViewer from './components/MessageViewer';
 import ImportPanel from './components/ImportPanel';
+import MobileDrawer from './components/MobileDrawer';
+import HamburgerButton from './components/HamburgerButton';
 import {
   search,
   getConversation,
@@ -64,6 +66,10 @@ function App() {
   const [recentSearches, setRecentSearches] = useState<string[]>([]);
   const [showHelp, setShowHelp] = useState(false);
   const [searchError, setSearchError] = useState<string | null>(null);
+  const [drawerOpen, setDrawerOpen] = useState(false);
+  const [isMobile, setIsMobile] = useState(
+    typeof window !== 'undefined' && window.innerWidth <= 768
+  );
   const isMac = typeof navigator !== 'undefined' && /Mac|iPod|iPhone|iPad/.test(navigator.platform);
   const conversationOffsetRef = useRef(0);
   const hasMoreRef = useRef(true);
@@ -74,6 +80,17 @@ function App() {
   // Load stats on mount
   useEffect(() => {
     getStats().then(setStats).catch(console.error);
+  }, []);
+
+  // Track mobile breakpoint
+  useEffect(() => {
+    const handleResize = () => {
+      const mobile = window.innerWidth <= 768;
+      setIsMobile(mobile);
+      if (!mobile) setDrawerOpen(false);
+    };
+    window.addEventListener('resize', handleResize);
+    return () => window.removeEventListener('resize', handleResize);
   }, []);
 
   useEffect(() => {
@@ -285,6 +302,7 @@ function App() {
   const handleSelectFromList = useCallback((conversationId: string, index: number) => {
     setSelectedIndex(index);
     handleSelectConversation(conversationId);
+    setDrawerOpen(false);
   }, [handleSelectConversation]);
 
   const handleSelectRecent = useCallback((value: string) => {
@@ -360,6 +378,12 @@ function App() {
   return (
     <div className="container">
       <header>
+        {isMobile && (
+          <HamburgerButton
+            isOpen={drawerOpen}
+            onClick={() => setDrawerOpen(!drawerOpen)}
+          />
+        )}
         <h1>Central Chat</h1>
         <div className="stats">
           {stats && (
@@ -479,37 +503,78 @@ function App() {
         </div>
       )}
 
-      <SearchBar
-        value={searchInput}
-        onChange={setSearchInput}
-        loading={searchLoading && !!query}
-        recentSearches={recentSearches}
-        onSelectRecent={handleSelectRecent}
-        error={searchError}
-        onToggleHelp={() => setShowHelp(true)}
-      />
+      {/* Search and Filters - desktop only (mobile has them in drawer) */}
+      {!isMobile && (
+        <>
+          <SearchBar
+            value={searchInput}
+            onChange={setSearchInput}
+            loading={searchLoading && !!query}
+            recentSearches={recentSearches}
+            onSelectRecent={handleSelectRecent}
+            error={searchError}
+            onToggleHelp={() => setShowHelp(true)}
+          />
 
-      <Filters
-        stats={stats}
-        selectedPlatform={platform}
-        onPlatformChange={setPlatform}
-      />
+          <Filters
+            stats={stats}
+            selectedPlatform={platform}
+            onPlatformChange={setPlatform}
+          />
+        </>
+      )}
 
       <div className="main-content">
-        <ConversationList
-          results={query ? results : []}
-          conversations={query ? [] : conversations}
-          loading={isSearchMode ? searchLoading : listLoading}
-          hasMore={!isSearchMode && hasMoreConversations}
-          loadingMore={!isSearchMode && listLoadingMore}
-          onLoadMore={!isSearchMode ? handleLoadMore : undefined}
-          selectedId={selectedConversation?.id}
-          selectedIndex={selectedIndex}
-          onSelect={handleSelectFromList}
-          isSearchMode={isSearchMode}
-          suggestions={buildSearchSuggestions(query)}
-          onSuggestionSelect={handleSelectSuggestion}
-        />
+        {isMobile ? (
+          <MobileDrawer isOpen={drawerOpen} onClose={() => setDrawerOpen(false)}>
+            {/* Search and Filters inside drawer on mobile */}
+            <div className="drawer-search-section">
+              <SearchBar
+                value={searchInput}
+                onChange={setSearchInput}
+                loading={searchLoading && !!query}
+                recentSearches={recentSearches}
+                onSelectRecent={handleSelectRecent}
+                error={searchError}
+                onToggleHelp={() => setShowHelp(true)}
+              />
+              <Filters
+                stats={stats}
+                selectedPlatform={platform}
+                onPlatformChange={setPlatform}
+              />
+            </div>
+            <ConversationList
+              results={query ? results : []}
+              conversations={query ? [] : conversations}
+              loading={isSearchMode ? searchLoading : listLoading}
+              hasMore={!isSearchMode && hasMoreConversations}
+              loadingMore={!isSearchMode && listLoadingMore}
+              onLoadMore={!isSearchMode ? handleLoadMore : undefined}
+              selectedId={selectedConversation?.id}
+              selectedIndex={selectedIndex}
+              onSelect={handleSelectFromList}
+              isSearchMode={isSearchMode}
+              suggestions={buildSearchSuggestions(query)}
+              onSuggestionSelect={handleSelectSuggestion}
+            />
+          </MobileDrawer>
+        ) : (
+          <ConversationList
+            results={query ? results : []}
+            conversations={query ? [] : conversations}
+            loading={isSearchMode ? searchLoading : listLoading}
+            hasMore={!isSearchMode && hasMoreConversations}
+            loadingMore={!isSearchMode && listLoadingMore}
+            onLoadMore={!isSearchMode ? handleLoadMore : undefined}
+            selectedId={selectedConversation?.id}
+            selectedIndex={selectedIndex}
+            onSelect={handleSelectFromList}
+            isSearchMode={isSearchMode}
+            suggestions={buildSearchSuggestions(query)}
+            onSuggestionSelect={handleSelectSuggestion}
+          />
+        )}
 
         <MessageViewer conversation={selectedConversation} />
       </div>
