@@ -257,6 +257,7 @@ html {
   font-size: 16px;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
+  background: var(--bg-void);
 }
 
 body {
@@ -267,6 +268,15 @@ body {
   line-height: 1.6;
   min-height: 100vh;
   overflow-x: hidden;
+  /* iOS safe area support - header handles top safe area */
+  padding-bottom: env(safe-area-inset-bottom);
+  padding-left: env(safe-area-inset-left);
+  padding-right: env(safe-area-inset-right);
+}
+
+#root {
+  min-height: 100vh;
+  background: var(--bg-void);
 }
 
 /* Subtle noise texture overlay */
@@ -2264,7 +2274,7 @@ header h1::after {
 /* Drawer backdrop - starts below header */
 .drawer-backdrop {
   position: fixed;
-  top: 65px; /* Below mobile header */
+  top: calc(65px + env(safe-area-inset-top, 0px)); /* Below mobile header + safe area */
   left: 0;
   right: 0;
   bottom: 0;
@@ -2286,7 +2296,7 @@ header h1::after {
 /* Drawer panel - full width, starts below header */
 .drawer-panel {
   position: fixed;
-  top: 65px; /* Below mobile header */
+  top: calc(65px + env(safe-area-inset-top, 0px)); /* Below mobile header + safe area */
   left: 0;
   right: 0;
   bottom: 0;
@@ -2400,9 +2410,10 @@ header h1::after {
     display: none;
   }
 
-  /* Header optimization - slimmed down and sticky */
+  /* Header optimization - fixed positioning to cover notch/safe area */
   header {
     padding: 12px 16px 12px 8px; /* Less padding on left for hamburger */
+    padding-top: calc(12px + env(safe-area-inset-top, 0px)); /* Content pushed below notch */
     margin-bottom: 0;
     flex-direction: row;
     gap: var(--space-2);
@@ -2410,9 +2421,16 @@ header h1::after {
     align-items: center;
     background: var(--bg-primary);
     border-bottom: 1px solid var(--border-default);
-    position: sticky;
+    position: fixed;
     top: 0;
+    left: 0;
+    right: 0;
     z-index: 60;
+  }
+
+  /* Push content below fixed header */
+  .container {
+    padding-top: calc(65px + env(safe-area-inset-top, 0px)); /* header height (~65px) + safe area */
   }
 
   header h1 {
