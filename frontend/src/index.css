@@ -2400,17 +2400,18 @@ header h1::after {
     display: none;
   }
 
-  /* Header optimization - slimmed down */
+  /* Header optimization - slimmed down and sticky */
   header {
-    padding: 12px 16px;
+    padding: 12px 16px 12px 8px; /* Less padding on left for hamburger */
     margin-bottom: 0;
     flex-direction: row;
-    gap: var(--space-3);
+    gap: var(--space-2);
     text-align: left;
     align-items: center;
     background: var(--bg-primary);
     border-bottom: 1px solid var(--border-default);
-    position: relative;
+    position: sticky;
+    top: 0;
     z-index: 60;
   }
 
