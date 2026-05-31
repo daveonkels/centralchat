@@ -84,6 +84,9 @@ def init_db():
     """Initialize database with schema."""
     db_path = get_db_path()
     conn = sqlite3.connect(str(db_path))
+    conn.execute("PRAGMA journal_mode=WAL")
+    conn.execute("PRAGMA synchronous=NORMAL")
+    conn.execute("PRAGMA foreign_keys=ON")
     conn.executescript(SCHEMA)
     conn.commit()
     conn.close()
@@ -94,6 +97,8 @@ def get_connection():
     """Get a database connection with row factory."""
     conn = sqlite3.connect(str(get_db_path()))
     conn.row_factory = sqlite3.Row
+    conn.execute("PRAGMA foreign_keys=ON")
+    conn.execute("PRAGMA busy_timeout=5000")
     try:
         yield conn
     finally:
@@ -101,7 +106,7 @@ def get_connection():
 
 
 def insert_conversation(conn: sqlite3.Connection, conv: dict) -> bool:
-    """Insert a conversation, returns True if inserted (not duplicate)."""
+    """Insert or refresh a conversation, returning True when newly inserted."""
     try:
         conn.execute(
             """
@@ -124,12 +129,34 @@ def insert_conversation(conn: sqlite3.Connection, conv: dict) -> bool:
         )
         return True
     except sqlite3.IntegrityError:
+        conn.execute(
+            """
+            UPDATE conversations
+            SET title = COALESCE(?, title),
+                summary = COALESCE(?, summary),
+                updated_at = COALESCE(?, updated_at),
+                model = COALESCE(?, model),
+                is_archived = ?,
+                metadata = COALESCE(?, metadata)
+            WHERE id = ? AND platform = ?
+            """,
+            (
+                conv.get("title"),
+                conv.get("summary"),
+                conv.get("updated_at"),
+                conv.get("model"),
+                conv.get("is_archived", False),
+                conv.get("metadata"),
+                conv["id"],
+                conv["platform"],
+            ),
+        )
         return False
 
 
-def insert_message(conn: sqlite3.Connection, msg: dict):
-    """Insert a message."""
-    conn.execute(
+def insert_message(conn: sqlite3.Connection, msg: dict) -> bool:
+    """Insert a message, returning True when newly inserted."""
+    cursor = conn.execute(
         """
         INSERT OR IGNORE INTO messages (id, conversation_id, role, content,
                                         created_at, sequence, parent_id, metadata)
@@ -146,14 +173,22 @@ def insert_message(conn: sqlite3.Connection, msg: dict):
             msg.get("metadata"),
         ),
     )
+    return cursor.rowcount > 0
 
 
-def insert_media_ref(conn: sqlite3.Connection, media: dict):
-    """Insert a media reference."""
-    conn.execute(
+def insert_media_ref(conn: sqlite3.Connection, media: dict) -> bool:
+    """Insert a media reference if it is not already present."""
+    cursor = conn.execute(
         """
         INSERT INTO media_refs (message_id, media_type, original_path, filename, metadata)
-        VALUES (?, ?, ?, ?, ?)
+        SELECT ?, ?, ?, ?, ?
+        WHERE NOT EXISTS (
+            SELECT 1 FROM media_refs
+            WHERE message_id = ?
+              AND media_type = ?
+              AND original_path = ?
+              AND COALESCE(filename, '') = COALESCE(?, '')
+        )
         """,
         (
             media["message_id"],
@@ -161,8 +196,13 @@ def insert_media_ref(conn: sqlite3.Connection, media: dict):
             media["original_path"],
             media.get("filename"),
             media.get("metadata"),
+            media["message_id"],
+            media["media_type"],
+            media["original_path"],
+            media.get("filename"),
         ),
     )
+    return cursor.rowcount > 0
 
 
 def rebuild_fts_index(conn: sqlite3.Connection):

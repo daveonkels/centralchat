@@ -11,6 +11,8 @@ class OpenAIParser(BaseParser):
     """Parser for ChatGPT/OpenAI export format."""
 
     platform = "openai"
+    json_filenames = ("conversations.json",)
+    filename_keywords = ("openai", "chatgpt", "conversation", "conversations")
 
     # Pattern to match OpenAI citation markers
     # They use Private Use Area Unicode: \ue200 (open), \ue201 (close), \ue202 (†)
@@ -20,28 +22,38 @@ class OpenAIParser(BaseParser):
     @classmethod
     def can_parse(cls, path: Path) -> bool:
         """Check for OpenAI export signature: conversations.json with mapping structure."""
-        conv_file = path / "conversations.json"
-        if not conv_file.exists():
-            return False
+        return cls._find_conversations_file(path) is not None
 
+    @classmethod
+    def _find_conversations_file(cls, path: Path) -> Path | None:
+        """Find an OpenAI conversations JSON file, including renamed exports."""
+        for conv_file in cls.candidate_json_files(path):
+            try:
+                with open(conv_file, "r", encoding="utf-8") as f:
+                    data = json.load(f)
+                    if isinstance(data, list) and len(data) > 0:
+                        first = data[0]
+                        if "mapping" in first and "create_time" in first:
+                            return conv_file
+            except (json.JSONDecodeError, KeyError, OSError, UnicodeDecodeError):
+                continue
+        return None
+
+    @classmethod
+    def _load_conversations(cls, path: Path) -> list[dict]:
+        conv_file = cls._find_conversations_file(path)
+        if not conv_file:
+            raise ValueError("Could not find an OpenAI conversations JSON file")
         try:
             with open(conv_file, "r", encoding="utf-8") as f:
-                data = json.load(f)
-                if isinstance(data, list) and len(data) > 0:
-                    first = data[0]
-                    return "mapping" in first and "create_time" in first
-        except (json.JSONDecodeError, KeyError):
-            pass
-
-        return False
+                return json.load(f)
+        except (json.JSONDecodeError, OSError, UnicodeDecodeError) as exc:
+            raise ValueError(f"Could not read OpenAI export: {exc}") from exc
 
     @classmethod
     def parse(cls, path: Path) -> Iterator[ParsedConversation]:
         """Parse OpenAI export and yield conversations."""
-        conv_file = path / "conversations.json"
-
-        with open(conv_file, "r", encoding="utf-8") as f:
-            conversations = json.load(f)
+        conversations = cls._load_conversations(path)
 
         for conv_data in conversations:
             created_at = cls._unix_to_iso(conv_data.get("create_time"))

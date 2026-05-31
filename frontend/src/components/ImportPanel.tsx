@@ -9,6 +9,7 @@ import {
   purgePlatforms,
   getStats,
   DetectedExport,
+  SkippedExport,
   ImportStatus,
   PurgeResult,
   Stats,
@@ -27,6 +28,7 @@ const PLATFORM_OPTIONS = [
 
 function ImportPanel({ onImportComplete }: ImportPanelProps) {
   const [exports, setExports] = useState<DetectedExport[]>([]);
+  const [skippedExports, setSkippedExports] = useState<SkippedExport[]>([]);
   const [importing, setImporting] = useState(false);
   const [results, setResults] = useState<ImportStatus[]>([]);
   const [error, setError] = useState<string | null>(null);
@@ -49,7 +51,10 @@ function ImportPanel({ onImportComplete }: ImportPanelProps) {
 
   useEffect(() => {
     scanImports()
-      .then((data) => setExports(data.detected_exports))
+      .then((data) => {
+        setExports(data.detected_exports);
+        setSkippedExports(data.skipped_exports || []);
+      })
       .catch((err) => setError(err.message));
     getStats()
       .then(setStats)
@@ -233,7 +238,7 @@ function ImportPanel({ onImportComplete }: ImportPanelProps) {
         </div>
         <div className="import-reassurance-item">
           <span className="check">✓</span>
-          <span>Only new conversations are added</span>
+          <span>New conversations and newly-added messages are merged</span>
         </div>
       </div>
 
@@ -310,8 +315,8 @@ function ImportPanel({ onImportComplete }: ImportPanelProps) {
             </button>
 
             <p className="import-note">
-              Accepts <code>.zip</code> or <code>.json</code> files. Filename must include:
-              openai, chatgpt, claude, anthropic, or raycast.
+              Accepts <code>.zip</code> or <code>.json</code> files from ChatGPT, Claude, or Raycast.
+              Provider keywords in filenames help detection.
             </p>
 
             {uploadError && (
@@ -381,6 +386,20 @@ function ImportPanel({ onImportComplete }: ImportPanelProps) {
                       {exp.platform}
                     </span>
                     <span className="file-name">{exp.name}</span>
+                  </div>
+                ))}
+              </div>
+            )}
+
+            {skippedExports.length > 0 && (
+              <div className="skipped-files">
+                <div className="detected-files-title">
+                  Skipped {skippedExports.length} folder{skippedExports.length !== 1 ? 's' : ''}
+                </div>
+                {skippedExports.map((exp) => (
+                  <div key={exp.path} className="skipped-file">
+                    <span className="file-name">{exp.name}</span>
+                    <span className="skip-reason">{exp.reason}</span>
                   </div>
                 ))}
               </div>

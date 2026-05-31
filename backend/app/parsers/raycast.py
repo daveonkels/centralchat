@@ -10,30 +10,42 @@ class RaycastParser(BaseParser):
     """Parser for Raycast AI chat export format."""
 
     platform = "raycast"
+    json_filenames = ("raycast_ai_chats.json",)
+    filename_keywords = ("raycast", "ai_chats", "chats")
 
     @classmethod
     def can_parse(cls, path: Path) -> bool:
         """Check for Raycast export signature: raycast_ai_chats.json with sessions."""
-        chat_file = path / "raycast_ai_chats.json"
-        if not chat_file.exists():
-            return False
+        return cls._find_chats_file(path) is not None
 
+    @classmethod
+    def _find_chats_file(cls, path: Path) -> Path | None:
+        """Find a Raycast AI chats JSON file, including renamed exports."""
+        for chat_file in cls.candidate_json_files(path):
+            try:
+                with open(chat_file, "r", encoding="utf-8") as f:
+                    data = json.load(f)
+                    if isinstance(data, dict) and "sessions" in data and "exported_at" in data:
+                        return chat_file
+            except (json.JSONDecodeError, KeyError, OSError, UnicodeDecodeError):
+                continue
+        return None
+
+    @classmethod
+    def _load_chats(cls, path: Path) -> dict:
+        chat_file = cls._find_chats_file(path)
+        if not chat_file:
+            raise ValueError("Could not find a Raycast AI chats JSON file")
         try:
             with open(chat_file, "r", encoding="utf-8") as f:
-                data = json.load(f)
-                return "sessions" in data and "exported_at" in data
-        except (json.JSONDecodeError, KeyError):
-            pass
-
-        return False
+                return json.load(f)
+        except (json.JSONDecodeError, OSError, UnicodeDecodeError) as exc:
+            raise ValueError(f"Could not read Raycast export: {exc}") from exc
 
     @classmethod
     def parse(cls, path: Path) -> Iterator[ParsedConversation]:
         """Parse Raycast export and yield conversations."""
-        chat_file = path / "raycast_ai_chats.json"
-
-        with open(chat_file, "r", encoding="utf-8") as f:
-            data = json.load(f)
+        data = cls._load_chats(path)
 
         export_date = data.get("exported_at", "")
         sessions = data.get("sessions", [])

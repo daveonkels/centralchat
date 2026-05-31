@@ -112,6 +112,41 @@ class BaseParser(ABC):
     """Base class for platform-specific parsers."""
 
     platform: str = "unknown"
+    json_filenames: tuple[str, ...] = ()
+    filename_keywords: tuple[str, ...] = ()
+
+    @classmethod
+    def candidate_json_files(cls, path: Path) -> Iterator[Path]:
+        """Yield likely JSON export files, preferring canonical names and hints."""
+        if path.is_file():
+            if path.suffix.lower() == ".json":
+                yield path
+            return
+
+        if not path.exists() or not path.is_dir():
+            return
+
+        yielded: set[Path] = set()
+
+        for filename in cls.json_filenames:
+            candidate = path / filename
+            if candidate.is_file():
+                yielded.add(candidate)
+                yield candidate
+
+        json_files = sorted(
+            child for child in path.iterdir()
+            if child.is_file() and child.suffix.lower() == ".json"
+        )
+        hinted_files = [
+            child for child in json_files
+            if any(keyword in child.name.lower() for keyword in cls.filename_keywords)
+        ]
+
+        for candidate in [*hinted_files, *json_files]:
+            if candidate not in yielded:
+                yielded.add(candidate)
+                yield candidate
 
     @classmethod
     @abstractmethod

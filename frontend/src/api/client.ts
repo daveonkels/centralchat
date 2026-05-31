@@ -1,5 +1,29 @@
 const API_BASE = '/api';
 
+async function getErrorMessage(res: Response, fallback: string): Promise<string> {
+  if (res.status === 413) {
+    return 'Upload is larger than the server currently allows. Use the imports folder or raise the upload limit.';
+  }
+
+  const contentType = res.headers.get('content-type') || '';
+  try {
+    if (contentType.includes('application/json')) {
+      const data = await res.json();
+      if (data?.detail) return data.detail;
+    } else {
+      const text = await res.text();
+      if (/request entity too large|client intended to send too large body/i.test(text)) {
+        return 'Upload is larger than the server currently allows. Use the imports folder or raise the upload limit.';
+      }
+      if (text.trim()) return `${fallback}: ${text.trim().slice(0, 160)}`;
+    }
+  } catch {
+    // Fall through to the status-based message.
+  }
+
+  return `${fallback} (${res.status}${res.statusText ? ` ${res.statusText}` : ''})`;
+}
+
 export interface SearchResult {
   conversation_id: string;
   message_id: string | null;
@@ -102,6 +126,18 @@ export interface DetectedExport {
   platform: string;
 }
 
+export interface SkippedExport {
+  path: string;
+  name: string;
+  reason: string;
+}
+
+export interface ImportScanResponse {
+  detected_exports: DetectedExport[];
+  skipped_exports?: SkippedExport[];
+  total_folders: number;
+}
+
 export async function search(
   query: string,
   options: { platform?: string; role?: string; before?: string; limit?: number; offset?: number } = {}
@@ -115,21 +151,14 @@ export async function search(
 
   const res = await fetch(`${API_BASE}/search?${params}`);
   if (!res.ok) {
-    let message = 'Search failed';
-    try {
-      const data = await res.json();
-      if (data?.detail) message = data.detail;
-    } catch {
-      // Ignore parse errors.
-    }
-    throw new Error(message);
+    throw new Error(await getErrorMessage(res, 'Search failed'));
   }
   return res.json();
 }
 
 export async function getConversation(id: string): Promise<Conversation> {
   const res = await fetch(`${API_BASE}/conversations/${id}`);
-  if (!res.ok) throw new Error('Failed to load conversation');
+  if (!res.ok) throw new Error(await getErrorMessage(res, 'Failed to load conversation'));
   return res.json();
 }
 
@@ -142,37 +171,37 @@ export async function listConversations(
   if (options.offset) params.set('offset', options.offset.toString());
 
   const res = await fetch(`${API_BASE}/conversations?${params}`);
-  if (!res.ok) throw new Error('Failed to list conversations');
+  if (!res.ok) throw new Error(await getErrorMessage(res, 'Failed to list conversations'));
   return res.json();
 }
 
 export async function getStats(): Promise<Stats> {
   const res = await fetch(`${API_BASE}/conversations/stats`);
-  if (!res.ok) throw new Error('Failed to get stats');
+  if (!res.ok) throw new Error(await getErrorMessage(res, 'Failed to get stats'));
   return res.json();
 }
 
-export async function scanImports(): Promise<{ detected_exports: DetectedExport[]; total_folders: number }> {
+export async function scanImports(): Promise<ImportScanResponse> {
   const res = await fetch(`${API_BASE}/import/scan`);
-  if (!res.ok) throw new Error('Failed to scan imports');
+  if (!res.ok) throw new Error(await getErrorMessage(res, 'Failed to scan imports'));
   return res.json();
 }
 
 export async function runImport(): Promise<ImportJobResponse> {
   const res = await fetch(`${API_BASE}/import/run`, { method: 'POST' });
-  if (!res.ok) throw new Error('Import failed');
+  if (!res.ok) throw new Error(await getErrorMessage(res, 'Import failed'));
   return res.json();
 }
 
 export async function getImportStatus(jobId: string): Promise<ImportJobResponse> {
   const res = await fetch(`${API_BASE}/import/status/${jobId}`);
-  if (!res.ok) throw new Error('Failed to get import status');
+  if (!res.ok) throw new Error(await getErrorMessage(res, 'Failed to get import status'));
   return res.json();
 }
 
 export async function cancelImport(jobId: string): Promise<ImportJobResponse> {
   const res = await fetch(`${API_BASE}/import/cancel/${jobId}`, { method: 'POST' });
-  if (!res.ok) throw new Error('Failed to cancel import');
+  if (!res.ok) throw new Error(await getErrorMessage(res, 'Failed to cancel import'));
   return res.json();
 }
 
@@ -181,14 +210,7 @@ export async function uploadImport(file: File): Promise<ImportStatus> {
   body.append('file', file);
   const res = await fetch(`${API_BASE}/import/upload`, { method: 'POST', body });
   if (!res.ok) {
-    let message = 'Upload failed';
-    try {
-      const data = await res.json();
-      if (data?.detail) message = data.detail;
-    } catch {
-      // Ignore parse errors.
-    }
-    throw new Error(message);
+    throw new Error(await getErrorMessage(res, 'Upload failed'));
   }
   return res.json();
 }
@@ -200,14 +222,7 @@ export async function purgePlatforms(platforms: string[]): Promise<PurgeResponse
     body: JSON.stringify({ platforms }),
   });
   if (!res.ok) {
-    let message = 'Failed to purge data';
-    try {
-      const data = await res.json();
-      if (data?.detail) message = data.detail;
-    } catch {
-      // Ignore parse errors.
-    }
-    throw new Error(message);
+    throw new Error(await getErrorMessage(res, 'Failed to purge data'));
   }
   return res.json();
 }

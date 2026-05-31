@@ -260,6 +260,32 @@ def _detect_platform_from_json_folder(folder: Path, uploaded_path: Path) -> str 
     return None
 
 
+def _undetected_folder_reason(folder: Path) -> str:
+    """Return a concise reason why an import folder was skipped."""
+    try:
+        json_files = [
+            child for child in folder.iterdir()
+            if child.is_file() and child.suffix.lower() == ".json"
+        ]
+    except OSError as exc:
+        return f"Could not read folder: {exc}"
+
+    if not json_files:
+        return "No JSON export files found in the folder root"
+
+    hinted = [
+        child.name for child in json_files
+        if detect_platform_from_filename(child.name)
+    ]
+    if hinted:
+        preview = ", ".join(hinted[:3])
+        if len(hinted) > 3:
+            preview += ", ..."
+        return f"Found {preview}, but the content did not match a supported export format"
+
+    return "Could not detect export format from the JSON files in this folder"
+
+
 @router.get("/scan", response_model=ImportScanResult)
 def scan_imports():
     """Scan the imports directory for export folders."""
@@ -269,6 +295,7 @@ def scan_imports():
         return ImportScanResult(detected_exports=[], total_folders=0)
 
     detected = []
+    skipped = []
     folders = [d for d in imports_path.iterdir() if d.is_dir()]
 
     for folder in folders:
@@ -279,8 +306,18 @@ def scan_imports():
                 "name": folder.name,
                 "platform": platform,
             })
+        else:
+            skipped.append({
+                "path": str(folder),
+                "name": folder.name,
+                "reason": _undetected_folder_reason(folder),
+            })
 
-    return ImportScanResult(detected_exports=detected, total_folders=len(folders))
+    return ImportScanResult(
+        detected_exports=detected,
+        skipped_exports=skipped,
+        total_folders=len(folders),
+    )
 
 
 @router.post("/upload", response_model=ImportStatus)
@@ -372,7 +409,7 @@ def run_import(background_tasks: BackgroundTasks):
                 platform="unknown",
                 source_path=str(folder),
                 status="error",
-                errors=["Could not detect export format"],
+                errors=[_undetected_folder_reason(folder)],
             ))
 
     if not results:
@@ -474,7 +511,7 @@ def run_import_single(folder_name: str):
             platform="unknown",
             source_path=str(folder),
             status="error",
-            errors=["Could not detect export format"],
+            errors=[_undetected_folder_reason(folder)],
         )
 
     return import_export(folder, platform, rebuild_fts=True)
@@ -567,18 +604,16 @@ def import_export(
 
                 status.conversations_found += 1
 
-                # Try to insert (will fail silently if duplicate)
+                # Re-imports refresh conversation metadata and merge any new messages.
                 if insert_conversation(conn, conv_dict):
                     conversations_imported += 1
 
-                    # Insert messages
-                    for msg in conv.messages:
-                        insert_message(conn, msg.to_dict())
+                for msg in conv.messages:
+                    if insert_message(conn, msg.to_dict()):
                         messages_imported += 1
 
-                    # Insert media refs
-                    for media in conv.media_refs:
-                        insert_media_ref(conn, media.to_dict())
+                for media in conv.media_refs:
+                    insert_media_ref(conn, media.to_dict())
 
             # Update import record with counts
             conn.execute(

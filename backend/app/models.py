@@ -76,6 +76,7 @@ class ImportStatus(BaseModel):
 
 class ImportScanResult(BaseModel):
     detected_exports: list[dict]
+    skipped_exports: list[dict] = Field(default_factory=list)
     total_folders: int
 
 
