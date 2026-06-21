@@ -21,12 +21,13 @@ class OpenAIParser(BaseParser):
 
     @classmethod
     def can_parse(cls, path: Path) -> bool:
-        """Check for OpenAI export signature: conversations.json with mapping structure."""
-        return cls._find_conversations_file(path) is not None
+        """Check for OpenAI export signature: conversation files with mapping structure."""
+        return bool(cls._find_conversation_files(path))
 
     @classmethod
-    def _find_conversations_file(cls, path: Path) -> Path | None:
-        """Find an OpenAI conversations JSON file, including renamed exports."""
+    def _find_conversation_files(cls, path: Path) -> list[Path]:
+        """Find OpenAI conversations JSON files, including split or renamed exports."""
+        conversation_files = []
         for conv_file in cls.candidate_json_files(path):
             try:
                 with open(conv_file, "r", encoding="utf-8") as f:
@@ -34,21 +35,25 @@ class OpenAIParser(BaseParser):
                     if isinstance(data, list) and len(data) > 0:
                         first = data[0]
                         if "mapping" in first and "create_time" in first:
-                            return conv_file
+                            conversation_files.append(conv_file)
             except (json.JSONDecodeError, KeyError, OSError, UnicodeDecodeError):
                 continue
-        return None
+        return conversation_files
 
     @classmethod
     def _load_conversations(cls, path: Path) -> list[dict]:
-        conv_file = cls._find_conversations_file(path)
-        if not conv_file:
-            raise ValueError("Could not find an OpenAI conversations JSON file")
-        try:
-            with open(conv_file, "r", encoding="utf-8") as f:
-                return json.load(f)
-        except (json.JSONDecodeError, OSError, UnicodeDecodeError) as exc:
-            raise ValueError(f"Could not read OpenAI export: {exc}") from exc
+        conv_files = cls._find_conversation_files(path)
+        if not conv_files:
+            raise ValueError("Could not find any OpenAI conversations JSON files")
+
+        conversations = []
+        for conv_file in conv_files:
+            try:
+                with open(conv_file, "r", encoding="utf-8") as f:
+                    conversations.extend(json.load(f))
+            except (json.JSONDecodeError, OSError, UnicodeDecodeError) as exc:
+                raise ValueError(f"Could not read OpenAI export {conv_file.name}: {exc}") from exc
+        return conversations
 
     @classmethod
     def parse(cls, path: Path) -> Iterator[ParsedConversation]:
@@ -89,6 +94,19 @@ class OpenAIParser(BaseParser):
     ) -> list[tuple[ParsedMessage, list[ParsedMediaRef]]]:
         """Flatten the tree structure to a linear sequence of messages."""
         results = []
+        children_by_parent: dict[str, list[str]] = {}
+
+        for node_id, node in mapping.items():
+            parent_id = node.get("parent")
+            if parent_id:
+                children_by_parent.setdefault(parent_id, []).append(node_id)
+
+        def child_sort_key(node_id: str):
+            message = mapping.get(node_id, {}).get("message") or {}
+            return message.get("create_time") or 0
+
+        for children in children_by_parent.values():
+            children.sort(key=child_sort_key)
 
         # Find root node (no parent or parent is None)
         roots = [
@@ -169,8 +187,14 @@ class OpenAIParser(BaseParser):
                     results.append((msg, media_refs))
                     seq += 1
 
-            # Traverse children
-            for child_id in node.get("children", []):
+            # Traverse children. Newer OpenAI exports can leave children arrays
+            # empty, so also reconstruct child links from each node's parent.
+            children = []
+            for child_id in [*(node.get("children") or []), *children_by_parent.get(node_id, [])]:
+                if child_id not in children:
+                    children.append(child_id)
+
+            for child_id in children:
                 traverse(child_id)
 
         for root in roots:

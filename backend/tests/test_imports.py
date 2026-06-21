@@ -1,5 +1,65 @@
+import json
+
 from app.routers import imports
 from app import database
+
+
+def openai_conversation(conv_id, msg_id, title, text, timestamp):
+    return {
+        "id": conv_id,
+        "title": title,
+        "create_time": timestamp,
+        "update_time": timestamp,
+        "default_model_slug": "gpt-4o",
+        "mapping": {
+            "root": {
+                "parent": None,
+                "children": [],
+                "message": None,
+            },
+            msg_id: {
+                "parent": "root",
+                "children": [],
+                "message": {
+                    "id": msg_id,
+                    "author": {"role": "user"},
+                    "content": {
+                        "content_type": "text",
+                        "parts": [text],
+                    },
+                    "create_time": timestamp,
+                },
+            },
+        },
+    }
+
+
+def write_openai_split_export(path):
+    path.mkdir(parents=True, exist_ok=True)
+    (path / "conversations-000.json").write_text(
+        json.dumps([
+            openai_conversation(
+                "openai-conv-1",
+                "openai-msg-1",
+                "First split chat",
+                "hello from the first split",
+                1767139200.0,
+            )
+        ]),
+        encoding="utf-8",
+    )
+    (path / "conversations-001.json").write_text(
+        json.dumps([
+            openai_conversation(
+                "openai-conv-2",
+                "openai-msg-2",
+                "Second split chat",
+                "hello from the second split",
+                1767225600.0,
+            )
+        ]),
+        encoding="utf-8",
+    )
 
 
 def write_claude_export(path, messages):
@@ -174,4 +234,28 @@ def test_reimport_merges_new_messages_for_existing_conversation(tmp_path):
     assert first_status.messages_imported == 1
     assert second_status.conversations_imported == 0
     assert second_status.messages_imported == 1
+    assert message_count == 2
+
+
+def test_import_openai_split_conversation_files(tmp_path):
+    db_path = tmp_path / "central-chat.db"
+    export = tmp_path / "openai-chatgpt-split"
+    write_openai_split_export(export)
+
+    original_db_path = database.DATABASE_PATH
+    database.DATABASE_PATH = str(db_path)
+    try:
+        database.init_db()
+        status = imports.import_export(export, "openai", rebuild_fts=False)
+
+        with database.get_connection() as conn:
+            conversation_count = conn.execute("SELECT COUNT(*) FROM conversations").fetchone()[0]
+            message_count = conn.execute("SELECT COUNT(*) FROM messages").fetchone()[0]
+    finally:
+        database.DATABASE_PATH = original_db_path
+
+    assert status.conversations_found == 2
+    assert status.conversations_imported == 2
+    assert status.messages_imported == 2
+    assert conversation_count == 2
     assert message_count == 2
