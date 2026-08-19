@@ -1,13 +1,13 @@
 # Build stage
-FROM node:20-slim AS build
+FROM node:22-slim AS build
 
 WORKDIR /app
 
-COPY package.json ./
-RUN npm install
+COPY package.json pnpm-lock.yaml pnpm-workspace.yaml ./
+RUN corepack pnpm install --frozen-lockfile
 
 COPY . .
-RUN npm run build
+RUN corepack pnpm run build
 
 # Production stage
 FROM nginx:alpine
