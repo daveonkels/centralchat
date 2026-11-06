@@ -16,6 +16,7 @@ import {
   Stats,
 } from '../api/client';
 import { PlatformIcon } from './PlatformIcons';
+import { ExportGuide } from './ExportGuide';
 
 interface ImportPanelProps {
   onImportComplete: () => void;
@@ -269,11 +270,11 @@ function ImportPanel({ onImportComplete }: ImportPanelProps) {
         </div>
         <div className="import-reassurance-item">
           <span className="check">✓</span>
-          <span>Safe to re-import — duplicates are automatically skipped</span>
+          <span>Re-importing the same file skips existing messages</span>
         </div>
         <div className="import-reassurance-item">
           <span className="check">✓</span>
-          <span>New conversations and newly-added messages are merged</span>
+          <span>Messages with stable source IDs are merged</span>
         </div>
       </div>
 
@@ -344,6 +345,8 @@ function ImportPanel({ onImportComplete }: ImportPanelProps) {
           ))}
         </div>
       )}
+
+      <ExportGuide />
 
       {/* Two import method cards */}
       <div className="import-methods">
@@ -468,28 +471,6 @@ function ImportPanel({ onImportComplete }: ImportPanelProps) {
               </div>
             )}
 
-            {/* Export links */}
-            <div className="export-links">
-              <div className="export-links-title">Get Your Data</div>
-              <div className="export-link">
-                <PlatformIcon platform="openai" size={14} className="platform-icon openai" />
-                <a href="https://help.openai.com/en/articles/7260999-how-do-i-export-my-chatgpt-history" target="_blank" rel="noreferrer">
-                  Request ChatGPT export
-                </a>
-              </div>
-              <div className="export-link">
-                <PlatformIcon platform="claude" size={14} className="platform-icon claude" />
-                <a href="https://support.claude.com/en/articles/9450526-how-can-i-export-my-claude-data" target="_blank" rel="noreferrer">
-                  Request Claude export
-                </a>
-              </div>
-              <div className="export-link">
-                <PlatformIcon platform="raycast" size={14} className="platform-icon raycast" />
-                <a href="https://github.com/daveonkels/raycast-ai-exporter" target="_blank" rel="noreferrer">
-                  Export Raycast chats
-                </a>
-              </div>
-            </div>
           </div>
         </div>
 

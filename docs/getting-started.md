@@ -61,11 +61,10 @@ backend on port 8000. Stop the Docker services first if they are using these por
 
 ## Import your conversations
 
-Request an export from the services you use:
-
-- [ChatGPT export instructions](https://help.openai.com/en/articles/7260999-how-do-i-export-my-chatgpt-history)
-- [Claude export instructions](https://support.claude.com/en/articles/9450526-how-can-i-export-my-claude-data)
-- [Raycast AI exporter](https://github.com/daveonkels/raycast-ai-exporter)
+**Need the files first?** Follow [Get your chat exports](exporting-your-chats.md)
+for step-by-step ChatGPT and Claude download instructions, the Raycast macOS
+exporter workflow, expected filenames, and troubleshooting. Raycast `.rayconfig`
+backups are not supported.
 
 Open **Import** in Central Chat. Choose either method:
 
@@ -90,8 +89,10 @@ Choose a complete export ZIP or a standalone JSON file, then select **Upload &
 Import**. Uploads are limited to 512 MB. For larger exports, use the server folder
 method instead of uploading individual JSON parts.
 
-Re-importing an export keeps existing conversations and merges newly added
-messages without duplicating them. Review the completion summary for skipped
+Re-importing the same export skips existing messages. ChatGPT and Claude exports
+with stable source IDs also merge newly added messages. Fresh Raycast exports can
+produce duplicates; see the [Raycast caveat](exporting-your-chats.md#if-the-import-does-not-work).
+Review the completion summary for skipped
 items or errors. **History** shows past imports; **Maintenance** contains archive
 removal controls.
 

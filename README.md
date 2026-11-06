@@ -20,15 +20,28 @@ view when you want to return to it.
 
 ## From scattered chats to a searchable archive
 
-1. **Export** your history from ChatGPT, Claude, or Raycast.
+1. **Export** your history from ChatGPT, Claude, or Raycast using the
+   [step-by-step export guide](docs/exporting-your-chats.md).
 2. **Import** a complete ZIP/JSON, or extract each export into its own folder and
    use **Detect & Import**. Keep numbered ChatGPT JSON parts together.
 3. **Search** across titles and messages, filter by source or content type, and
    save useful views.
 
 To keep the archive current, download a fresh export and import it again.
-Existing conversations are kept and new messages are merged without duplicates.
+ChatGPT and Claude messages with stable source IDs merge into existing conversations.
+Fresh Raycast exports can create duplicates; see the [export guide's caveat](docs/exporting-your-chats.md#if-the-import-does-not-work).
 Folder detection runs when you rescan; it does not watch for new files automatically.
+
+### Where do I get my files?
+
+| Source | Start here | File to bring back |
+| --- | --- | --- |
+| ChatGPT | [Settings → Data controls → Export data](docs/exporting-your-chats.md#chatgpt) | The downloaded ZIP; keep all numbered JSON parts together |
+| Claude | [Settings → Privacy → Export data](docs/exporting-your-chats.md#claude) | The downloaded ZIP containing `conversations.json` |
+| Raycast | [Run the macOS chat exporter](docs/exporting-your-chats.md#raycast-macos) | `raycast_ai_chats.json`, not a `.rayconfig` backup |
+
+The [full guide](docs/exporting-your-chats.md) covers download links, account
+restrictions, Raycast setup, server-folder locations, and common import problems.
 
 ## Find more than a title
 
@@ -49,8 +62,8 @@ Folder detection runs when you rescan; it does not watch for new files automatic
   Markdown tables, syntax-highlighted code, and copy controls for messages and
   links.
 - **Import complete exports.** Detect extracted folders or upload a ZIP/JSON.
-  Numbered ChatGPT JSON parts stay together; re-imports merge new messages without
-  duplicating existing ones.
+  Numbered ChatGPT JSON parts stay together; stable source IDs let re-imports
+  merge messages. See the export guide for Raycast's re-export limitation.
 
 ## Quick start
 
