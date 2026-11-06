@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { FiArchive, FiUpload, FiMenu, FiSliders, FiBookmark, FiChevronRight, FiX, FiLayers, FiSun, FiMoon } from 'react-icons/fi';
+import { FiArchive, FiUpload, FiMenu, FiSliders, FiBookmark, FiChevronRight, FiX, FiSun, FiMoon } from 'react-icons/fi';
 import { contentAttributes } from './components/ContentBadges';
 import DisplayOptions from './components/DisplayOptions';
 import { DEFAULT_DISPLAY, sanitizeDisplay } from './utils/display';
@@ -13,6 +13,8 @@ import { platformName } from './utils/presentation';
 import ConversationList from './components/ConversationList';
 import MessageViewer from './components/MessageViewer';
 import ImportPanel from './components/ImportPanel';
+import { BrandMark } from './components/BrandMark';
+import { syncBrandTheme } from './utils/brand';
 import Dialog from './components/Dialog';
 import { search, getConversation, listConversations, getStats, SearchResult, Conversation, Stats, ConversationTarget, ContentAttribute } from './api/client';
 import { parseSearchInput } from './utils/search';
@@ -92,6 +94,7 @@ function App() {
 
   useEffect(() => {
     document.documentElement.dataset.theme = theme;
+    syncBrandTheme(theme);
     try { localStorage.setItem('central-chat.theme', JSON.stringify(theme)); } catch { /* Storage can be disabled. */ }
   }, [theme]);
 
@@ -312,7 +315,7 @@ function App() {
       <aside className="workspace-nav">{navigation}</aside>
       <main className="workspace" id="archive-content">
         <header className="workspace-header">
-          <a className="mobile-home" href="/" aria-label="Go to archive home" onClick={event => { event.preventDefault(); goHome(); }}><span className="brand-symbol"><FiLayers aria-hidden="true" /></span></a>
+          <a className="mobile-home" href="/" aria-label="Go to archive home" onClick={event => { event.preventDefault(); goHome(); }}><BrandMark /></a>
           <button className="icon-button mobile-menu" aria-label="Open navigation" onClick={() => setShowNav(true)}><FiMenu /></button>
           <div className="breadcrumb"><FiArchive aria-hidden="true" /><span className="breadcrumb-parent">Archive</span><FiChevronRight className="breadcrumb-divider" aria-hidden="true" /><h1>{pageTitle}</h1></div>
           <div className="workspace-header-actions"><span className="archive-label"><span className="status-dot" />Personal archive</span><button className="icon-button theme-toggle" aria-label={`Switch to ${theme === 'dark' ? 'light' : 'dark'} theme`} title={`Switch to ${theme === 'dark' ? 'light' : 'dark'} theme`} onClick={() => setTheme(theme === 'dark' ? 'light' : 'dark')}>{theme === 'dark' ? <FiSun /> : <FiMoon />}</button><button className="import-action" title="Import conversations" onClick={() => setShowImport(true)}><FiUpload aria-hidden="true" /><span>Import</span></button></div>

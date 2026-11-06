@@ -40,7 +40,8 @@ mark { color:var(--mark-text); background:var(--mark-bg); border-radius:2px; pad
 .workspace-nav { width:224px; flex:none; }.workspace-nav-content { display:flex; flex-direction:column; height:100%; padding:8px 12px 0; }
 .workspace-brand { display:flex; width:100%; justify-content:start; gap:10px; border:0; background:transparent; padding:6px 4px 18px; text-align:left; font-size:14px; font-weight:600; }
 .workspace-brand > span:nth-child(2) { flex:1; }.workspace-brand small { display:block; margin-top:3px; color:var(--text-muted); font-weight:400; font-size:11px; }.workspace-brand > svg { width:13px; color:var(--text-muted); }
-.brand-symbol { display:grid; place-items:center; width:28px; height:28px; background:#7265ca; color:#fff; border:1px solid #9389d3; border-radius:7px; }.brand-symbol svg { width:17px; height:17px; }
+.brand-symbol { display:grid; place-items:center; width:32px; height:32px; flex:none; }.brand-symbol img { width:100%; height:100%; display:block; }.brand-symbol .brand-mark-light { display:none; }
+:root[data-theme="light"] .brand-symbol .brand-mark-dark { display:none; }:root[data-theme="light"] .brand-symbol .brand-mark-light { display:block; }
 .workspace-nav nav { overflow-y:auto; min-height:0; flex:1; }.nav-section { display:grid; gap:2px; margin-bottom:24px; }.nav-section h2 { padding:0 9px 8px; font-size:11px; color:var(--text-muted); font-weight:500; }
 .nav-item { display:flex; width:100%; min-height:34px; justify-content:start; border:0; border-radius:5px; background:transparent; padding:7px 9px; text-align:left; gap:10px; color:var(--text-secondary); }
 .nav-item > span:not(.source-icon):not(.nav-count) { flex:1; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }.nav-item.active { color:var(--text-primary); background:var(--selection); font-weight:550; }.nav-item > svg { color:var(--text-muted); width:15px; height:15px; }
@@ -725,7 +726,7 @@ button.content-badge:hover { filter:brightness(1.12); box-shadow:0 0 0 1px curre
   .thread-toolbar { margin-bottom:12px; }
   .thread-position { font-size:10px; margin-right:2px; }
 }
-@media (max-width:900px) { .mobile-home { display:flex; align-items:center; justify-content:center; width:40px; min-height:40px; }.mobile-home .brand-symbol { width:26px; height:26px; border-radius:6px; }.workspace-header .mobile-menu { margin-left:auto; order:2; }.workspace-header-actions { margin-left:0; order:3; }.workspace-header .breadcrumb { flex:1; } }
+@media (max-width:900px) { .mobile-home { display:flex; align-items:center; justify-content:center; width:40px; min-height:40px; }.mobile-home .brand-symbol { width:32px; height:32px; }.workspace-header .mobile-menu { margin-left:auto; order:2; }.workspace-header-actions { margin-left:0; order:3; }.workspace-header .breadcrumb { flex:1; } }
 
 /* Import is an occasional workspace action, not the primary task. */
 .import-action { background:transparent; border-color:transparent; color:var(--text-secondary); font-weight:400; }

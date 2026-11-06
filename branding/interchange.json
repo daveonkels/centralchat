@@ -1,0 +1,15 @@
+{
+  "viewBox": 32,
+  "strokeWidth": 3.8,
+  "station": {"cx": 16.5, "cy": 18, "radius": 5, "strokeWidth": 2.4},
+  "routes": [
+    {"color": "red", "commands": [["M", 4, 7], ["L", 8, 7], ["C", 12, 7, 12, 11, 13.5, 14], ["L", 16.5, 18]]},
+    {"color": "gold", "commands": [["M", 24, 3], ["L", 24, 8], ["C", 24, 12, 19, 11, 17.5, 14], ["L", 16.5, 18]]},
+    {"color": "teal", "commands": [["M", 3, 18], ["L", 16.5, 18]]},
+    {"color": "blue", "commands": [["M", 6, 28], ["L", 11, 23], ["C", 13, 21, 15, 21, 16.5, 18]]}
+  ],
+  "themes": {
+    "light": {"background": "#FAF7F0", "station": "#FAF7F0", "outline": "#202526", "red": "#ED4D50", "gold": "#F4B918", "teal": "#20AEA6", "blue": "#6584EF"},
+    "dark": {"background": "#142039", "station": "#142039", "outline": "#F8F5EC", "red": "#FF6869", "gold": "#FFD04A", "teal": "#3DCBC0", "blue": "#8A9DFF"}
+  }
+}

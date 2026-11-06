@@ -1,7 +1,8 @@
-import { FiArchive, FiSearch, FiUpload, FiClock, FiHelpCircle, FiLayers, FiBookmark, FiMoreHorizontal, FiPlus } from 'react-icons/fi';
+import { FiArchive, FiSearch, FiUpload, FiClock, FiHelpCircle, FiBookmark, FiMoreHorizontal, FiPlus } from 'react-icons/fi';
 import { SavedView } from '../api/views';
 import { PlatformIcon } from './PlatformIcons';
 import { Stats } from '../api/client';
+import { BrandMark } from './BrandMark';
 import { platformName } from '../utils/presentation';
 
 interface Props {
@@ -14,7 +15,7 @@ interface Props {
 }
 export default function WorkspaceNav(props: Props) {
   return <div className="workspace-nav-content">
-    <button className="workspace-brand" onClick={props.onArchive}><span className="brand-symbol"><FiLayers aria-hidden="true" /></span><span>Central Chat<small>Personal workspace</small></span></button>
+    <button className="workspace-brand" onClick={props.onArchive}><BrandMark /><span>Central Chat<small>Personal workspace</small></span></button>
     <nav aria-label="Workspace navigation">
       <div className="nav-section">
         <button className={`nav-item ${!props.activeViewId && props.searching ? 'active' : ''}`} onClick={props.onSearch}><FiSearch aria-hidden="true" /><span>Search</span><kbd>/</kbd></button>

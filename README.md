@@ -1,5 +1,10 @@
 # Central Chat
 
+<picture>
+  <source media="(prefers-color-scheme: dark)" srcset="frontend/public/brand/v1/mark-dark.svg">
+  <img src="frontend/public/brand/v1/mark-light.svg" alt="Central Chat interchange mark" width="64" height="64">
+</picture>
+
 [![License: MIT](https://img.shields.io/badge/license-MIT-blue)](LICENSE)
 [![Live demo](https://img.shields.io/badge/demo-live-5145a6)](https://centralchat.fyi)
 
