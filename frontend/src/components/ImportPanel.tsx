@@ -1,9 +1,10 @@
 import { useState, useEffect, useRef, ChangeEvent } from 'react';
-import { MdUpload, MdFolder, MdWarning, MdFileUpload } from 'react-icons/md';
+import { FiUpload as MdUpload, FiFolder as MdFolder, FiFilePlus as MdFileUpload } from 'react-icons/fi';
 import {
   scanImports,
   runImport,
   getImportStatus,
+  getActiveImport,
   cancelImport,
   uploadImport,
   purgePlatforms,
@@ -29,6 +30,9 @@ const PLATFORM_OPTIONS = [
 function ImportPanel({ onImportComplete }: ImportPanelProps) {
   const [exports, setExports] = useState<DetectedExport[]>([]);
   const [skippedExports, setSkippedExports] = useState<SkippedExport[]>([]);
+  const [importsPath, setImportsPath] = useState('');
+  const [scanning, setScanning] = useState(true);
+  const [scanError, setScanError] = useState<string | null>(null);
   const [importing, setImporting] = useState(false);
   const [results, setResults] = useState<ImportStatus[]>([]);
   const [error, setError] = useState<string | null>(null);
@@ -46,16 +50,44 @@ function ImportPanel({ onImportComplete }: ImportPanelProps) {
   const [jobCompleted, setJobCompleted] = useState(false);
   const [jobCanceled, setJobCanceled] = useState(false);
   const [canceling, setCanceling] = useState(false);
-  const [dangerZoneOpen, setDangerZoneOpen] = useState(false);
+  const [view, setView] = useState<'import' | 'history' | 'maintenance'>('import');
+  const [confirmation, setConfirmation] = useState('');
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const panelRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
-    scanImports()
-      .then((data) => {
-        setExports(data.detected_exports);
-        setSkippedExports(data.skipped_exports || []);
-      })
-      .catch((err) => setError(err.message));
+    if (view === 'import' && (importing || uploading || jobCompleted)) {
+      panelRef.current?.closest('.dialog-content')?.scrollTo({ top: 0 });
+    }
+  }, [view, importing, uploading, jobCompleted]);
+
+  const refreshScan = async () => {
+    setScanning(true);
+    setScanError(null);
+    try {
+      const data = await scanImports();
+      setExports(data.detected_exports);
+      setSkippedExports(data.skipped_exports || []);
+      setImportsPath(data.imports_path);
+      setScanError(data.errors?.join(' ') || null);
+    } catch (err) {
+      setScanError(err instanceof Error ? err.message : 'Could not scan imports');
+    } finally {
+      setScanning(false);
+    }
+  };
+
+  useEffect(() => {
+    refreshScan();
+    getActiveImport().then((job) => {
+      if (job) {
+        setJobId(job.job_id);
+        setResults(job.statuses);
+        setJobCompleted(job.completed);
+        setJobCanceled(job.canceled);
+        setImporting(!job.completed);
+      }
+    }).catch((err) => setError(err.message));
     getStats()
       .then(setStats)
       .catch(console.error);
@@ -102,6 +134,7 @@ function ImportPanel({ onImportComplete }: ImportPanelProps) {
     const poll = async () => {
       try {
         const status = await getImportStatus(jobId);
+        setError(null);
         setResults(status.statuses);
         setJobCompleted(status.completed);
         setJobCanceled(status.canceled);
@@ -112,7 +145,7 @@ function ImportPanel({ onImportComplete }: ImportPanelProps) {
         }
       } catch (err) {
         setError(err instanceof Error ? err.message : 'Failed to refresh import status');
-        setImporting(false);
+        if (err instanceof Error && err.message.includes('not found')) setImporting(false);
       }
     };
 
@@ -174,7 +207,7 @@ function ImportPanel({ onImportComplete }: ImportPanelProps) {
     .map((platform) => platform.id);
 
   const handlePurge = async () => {
-    if (purging || selectedPlatforms.length === 0) return;
+    if (purging || importing || uploading || selectedPlatforms.length === 0 || confirmation !== 'delete selected') return;
     const label = selectedPlatforms.join(', ');
     const confirmed = window.confirm(
       `This will permanently delete all ${label} data from the database. This cannot be undone. Continue?`
@@ -187,7 +220,7 @@ function ImportPanel({ onImportComplete }: ImportPanelProps) {
     try {
       const response = await purgePlatforms(selectedPlatforms);
       setPurgeResults(response.results);
-      setPurgeSelection({});
+      setPurgeSelection({}); setConfirmation('');
       onImportComplete();
       refreshStats();
     } catch (err) {
@@ -205,14 +238,11 @@ function ImportPanel({ onImportComplete }: ImportPanelProps) {
   // Progress calculations
   const totalJobs = results.length;
   const completedJobs = results.filter((r) => ['completed', 'error', 'canceled'].includes(r.status)).length;
-  const runningJobs = results.filter((r) => r.status === 'running').length;
-  const estimatedUnits = Math.min(completedJobs + runningJobs * 0.5, totalJobs);
-  const estimatedPercent = totalJobs > 0 ? Math.round((estimatedUnits / totalJobs) * 100) : 0;
-  const displayPercent = jobCompleted ? 100 : estimatedPercent;
+  const displayPercent = totalJobs > 0 ? Math.round(completedJobs / totalJobs * 100) : 0;
 
   const progressLabel = jobCanceled
     ? (jobCompleted ? 'Canceled' : 'Canceling...')
-    : (jobCompleted ? 'Complete' : 'Importing...');
+    : (jobCompleted ? 'Complete' : 'Importing on the server');
 
   // Find currently running job for status display
   const runningJob = results.find((r) => r.status === 'running');
@@ -223,14 +253,19 @@ function ImportPanel({ onImportComplete }: ImportPanelProps) {
   const isOperating = importing || uploading || purging;
 
   return (
-    <div className="import-section">
-      <h2>Import Data</h2>
+    <div className="import-section" ref={panelRef}>
+      <div className="import-tabs" role="group" aria-label="Data management">
+        {(['import', 'history', 'maintenance'] as const).map(tab => <button key={tab} aria-pressed={view === tab} onClick={() => setView(tab)}>{tab === 'import' ? 'Import' : tab === 'history' ? 'History' : 'Maintenance'}</button>)}
+      </div>
+      {view === 'history' && <div className="import-history"><p>Completed imports recorded by this server.</p>{stats?.imports.length ? stats.imports.map(record => <article key={record.id}><strong>{PLATFORM_OPTIONS.find(p => p.id === record.platform)?.label || record.platform}</strong><small>{new Date(record.import_date).toLocaleString()}</small><p>{formatSourceName(record.source_path || '')}</p><p>{record.conversation_count.toLocaleString()} new conversations · {record.message_count.toLocaleString()} new messages</p></article>) : <p>No import history available.</p>}</div>}
+      {view === 'import' && <>
+
 
       {/* Reassurance callout */}
       <div className="import-reassurance">
         <div className="import-reassurance-item">
           <span className="check">✓</span>
-          <span>Data stays local in <code>data/central-chat.db</code></span>
+          <span>Your archive stays on this server</span>
         </div>
         <div className="import-reassurance-item">
           <span className="check">✓</span>
@@ -258,7 +293,8 @@ function ImportPanel({ onImportComplete }: ImportPanelProps) {
               </button>
             )}
           </div>
-          <div className="import-progress-bar">
+          <p className="import-note">{uploading ? 'Keep this dialog open while the file uploads.' : `You can close this dialog and return to reconnect. ${completedJobs} of ${totalJobs} exports finished.`}</p>
+          <div className="import-progress-bar" role="progressbar" aria-label="Exports finished" aria-valuemin={0} aria-valuemax={totalJobs || 1} aria-valuenow={completedJobs}>
             <div
               className="import-progress-fill"
               style={{ width: `${displayPercent}%` }}
@@ -266,7 +302,7 @@ function ImportPanel({ onImportComplete }: ImportPanelProps) {
           </div>
           {statusJob && (
             <div className="import-progress-status">
-              {statusJob.platform}: {statusJob.conversations_imported} new conversations
+              {formatSourceName(statusJob.source_path)}: {statusJob.conversations_found.toLocaleString()} conversations processed
             </div>
           )}
           {uploading && (
@@ -277,16 +313,108 @@ function ImportPanel({ onImportComplete }: ImportPanelProps) {
         </div>
       )}
 
+      {/* Import results */}
+      {results.length > 0 && jobCompleted && (
+        <div className="import-results" role="status">
+          <h3>{jobCanceled ? 'Import canceled' : results.some(result => result.status === 'error') ? 'Import finished with issues' : 'Import complete'}</h3>
+          <div className="import-summary"><div><strong>{results.reduce((sum, result) => sum + result.conversations_imported, 0).toLocaleString()}</strong><span>New conversations</span></div><div><strong>{results.reduce((sum, result) => sum + result.messages_imported, 0).toLocaleString()}</strong><span>New messages</span></div></div>
+          {results.map((result, idx) => (
+            <div
+              key={idx}
+              className={`import-status ${result.status === 'completed' ? 'success' : result.status === 'error' ? 'error' : result.status === 'canceled' ? 'canceled' : ''}`}
+            >
+              <strong>{result.platform}</strong> ({formatSourceName(result.source_path)}): {result.status}
+              {result.status !== 'error' && (
+                <>
+                  {' '} — {result.conversations_found} found, {result.conversations_imported}{' '}
+                  <span className="import-count-new" title="New conversations not previously imported">
+                    new
+                  </span>
+                  , {result.messages_imported} messages
+                </>
+              )}
+              {result.errors.length > 0 && (
+                <ul>
+                  {result.errors.map((err, i) => (
+                    <li key={i}>{err}</li>
+                  ))}
+                </ul>
+              )}
+            </div>
+          ))}
+        </div>
+      )}
+
       {/* Two import method cards */}
       <div className="import-methods">
+        {/* Folder Import Card */}
+        <div className="import-method-card import-method-folder">
+          <div className="import-method-title"><MdFolder /> Detect &amp; Import</div>
+          <div className="import-method-content">
+            <p className="import-note">Recommended for large exports. Extract your complete export into its own server folder:</p>
+            <div className="folder-path">{importsPath || 'Loading server folder…'}</div>
+            <p className="import-note">Keep every numbered JSON part together. Nested folders are detected automatically. Finish copying the export before scanning.</p>
+            <button type="button" className="browse-btn" onClick={refreshScan} disabled={scanning || isOperating}>
+              {scanning ? 'Scanning…' : 'Rescan folder'}
+            </button>
+            {scanError && <div className="import-status error" role="alert">{scanError}</div>}
+
+            {scanning ? <p className="no-files" role="status">Checking export folders and conversation parts…</p> : exports.length === 0 ? (
+              <p className="no-files">No supported exports detected. Extract your ZIP here, then rescan.</p>
+            ) : (
+              <div className="detected-files">
+                <div className="detected-files-title">
+                  Detected {exports.length} export{exports.length !== 1 ? 's' : ''}
+                </div>
+                {exports.map((exp) => (
+                  <div key={exp.path} className="detected-file">
+                    <span className={`platform-badge ${exp.platform}`}>
+                      <PlatformIcon platform={exp.platform} size={12} />
+                      {exp.platform}
+                    </span>
+                    <details><summary className="file-name">{exp.name} · {exp.file_count || 1} JSON file{exp.file_count === 1 ? '' : 's'}</summary><ul>{(exp.files || [exp.path]).map(file => <li key={file}>{file}</li>)}</ul></details>
+                  </div>
+                ))}
+              </div>
+            )}
+
+            {skippedExports.length > 0 && (
+              <div className="skipped-files">
+                <div className="detected-files-title">
+                  Not imported: {skippedExports.length} item{skippedExports.length !== 1 ? 's' : ''}
+                </div>
+                {skippedExports.map((exp) => (
+                  <div key={exp.path} className="skipped-file">
+                    <span className="file-name">{exp.name}</span>
+                    <span className="skip-reason">{exp.reason}</span>
+                  </div>
+                ))}
+              </div>
+            )}
+
+            <button
+              className="import-btn"
+              onClick={handleImport}
+              disabled={isOperating || scanning || !!scanError || exports.length === 0}
+            >
+              {importing ? 'Importing...' : `Detect & Import (${exports.length})`}
+            </button>
+
+            {error && (
+              <div className="import-status error">
+                Error: {error}
+              </div>
+            )}
+          </div>
+        </div>
         {/* Upload File Card */}
         <div className="import-method-card">
-          <div className="import-method-title"><MdUpload /> Upload File</div>
+          <div className="import-method-title"><MdUpload /> Upload &amp; Import</div>
           <div className="import-method-content">
             <input
               ref={fileInputRef}
               key={uploadInputKey}
-              className="upload-input-hidden"
+              hidden
               type="file"
               accept=".zip,.json,application/zip,application/json"
               onChange={handleUploadChange}
@@ -315,8 +443,8 @@ function ImportPanel({ onImportComplete }: ImportPanelProps) {
             </button>
 
             <p className="import-note">
-              Accepts <code>.zip</code> or <code>.json</code> files from ChatGPT, Claude, or Raycast.
-              Provider keywords in filenames help detection.
+              Choose the complete export ZIP from ChatGPT or Claude, or a JSON export from Raycast.
+              For large ChatGPT exports, use Detect &amp; Import so you don’t have to upload individual parts. Uploads are limited to 512 MB.
             </p>
 
             {uploadError && (
@@ -365,106 +493,11 @@ function ImportPanel({ onImportComplete }: ImportPanelProps) {
           </div>
         </div>
 
-        {/* Folder Import Card */}
-        <div className="import-method-card">
-          <div className="import-method-title"><MdFolder /> Import from Folder</div>
-          <div className="import-method-content">
-            <p className="import-note">Place export files in the imports folder:</p>
-            <div className="folder-path">./imports/</div>
-
-            {exports.length === 0 ? (
-              <p className="no-files">No export files detected</p>
-            ) : (
-              <div className="detected-files">
-                <div className="detected-files-title">
-                  Detected {exports.length} file{exports.length !== 1 ? 's' : ''}
-                </div>
-                {exports.map((exp) => (
-                  <div key={exp.path} className="detected-file">
-                    <span className={`platform-badge ${exp.platform}`}>
-                      <PlatformIcon platform={exp.platform} size={12} />
-                      {exp.platform}
-                    </span>
-                    <span className="file-name">{exp.name}</span>
-                  </div>
-                ))}
-              </div>
-            )}
-
-            {skippedExports.length > 0 && (
-              <div className="skipped-files">
-                <div className="detected-files-title">
-                  Skipped {skippedExports.length} folder{skippedExports.length !== 1 ? 's' : ''}
-                </div>
-                {skippedExports.map((exp) => (
-                  <div key={exp.path} className="skipped-file">
-                    <span className="file-name">{exp.name}</span>
-                    <span className="skip-reason">{exp.reason}</span>
-                  </div>
-                ))}
-              </div>
-            )}
-
-            <button
-              className="import-btn"
-              onClick={handleImport}
-              disabled={isOperating || exports.length === 0}
-            >
-              {importing ? 'Importing...' : 'Import All'}
-            </button>
-
-            {error && (
-              <div className="import-status error">
-                Error: {error}
-              </div>
-            )}
-          </div>
-        </div>
       </div>
 
-      {/* Import results */}
-      {results.length > 0 && jobCompleted && (
-        <div className="import-results">
-          {results.map((result, idx) => (
-            <div
-              key={idx}
-              className={`import-status ${result.status === 'completed' ? 'success' : result.status === 'error' ? 'error' : result.status === 'canceled' ? 'canceled' : ''}`}
-            >
-              <strong>{result.platform}</strong> ({formatSourceName(result.source_path)}): {result.status}
-              {result.status !== 'error' && (
-                <>
-                  {' '} — {result.conversations_found} found, {result.conversations_imported}{' '}
-                  <span className="import-count-new" title="New conversations not previously imported">
-                    new
-                  </span>
-                  , {result.messages_imported} messages
-                </>
-              )}
-              {result.errors.length > 0 && (
-                <ul>
-                  {result.errors.map((err, i) => (
-                    <li key={i}>{err}</li>
-                  ))}
-                </ul>
-              )}
-            </div>
-          ))}
-        </div>
-      )}
 
-      {/* Danger Zone (collapsed) */}
-      <div className="danger-zone">
-        <button
-          className="danger-zone-toggle"
-          onClick={() => setDangerZoneOpen(!dangerZoneOpen)}
-          type="button"
-        >
-          <span className={`chevron ${dangerZoneOpen ? 'open' : ''}`}>▶</span>
-          <MdWarning className="danger-icon" />
-          Danger Zone
-        </button>
-
-        {dangerZoneOpen && (
+      </>}
+      {view === 'maintenance' && <div className="danger-zone">
           <div className="danger-zone-content">
             <p className="danger-zone-note">
               Permanently delete all conversations, messages, and media refs for selected platforms.
@@ -487,7 +520,7 @@ function ImportPanel({ onImportComplete }: ImportPanelProps) {
                         ...prev,
                         [platform.id]: !prev[platform.id],
                       }))}
-                      disabled={purging || importing}
+                      disabled={isOperating}
                     />
                     <span className={`platform-badge ${platform.id}`}>
                       <PlatformIcon platform={platform.id} size={12} />
@@ -499,13 +532,14 @@ function ImportPanel({ onImportComplete }: ImportPanelProps) {
               })}
             </div>
 
+            <label className="maintenance-confirm"><span>Type <strong>delete selected</strong> to enable deletion.</span><input value={confirmation} onChange={event => setConfirmation(event.target.value)} autoComplete="off" disabled={isOperating} /></label>
             <button
               className="purge-btn"
               onClick={handlePurge}
-              disabled={purging || importing || selectedPlatforms.length === 0}
+              disabled={isOperating || selectedPlatforms.length === 0 || confirmation !== 'delete selected'}
               type="button"
             >
-              {purging ? 'Purging...' : 'Purge Selected'}
+              {purging ? 'Deleting...' : 'Delete selected providers'}
             </button>
 
             {purgeError && (
@@ -525,8 +559,7 @@ function ImportPanel({ onImportComplete }: ImportPanelProps) {
               </div>
             )}
           </div>
-        )}
-      </div>
+      </div>}
     </div>
   );
 }

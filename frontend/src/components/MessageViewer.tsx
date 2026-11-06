@@ -1,7 +1,11 @@
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { Children, cloneElement, isValidElement, ReactNode, useEffect, useRef, useState } from 'react';
 import ReactMarkdown from 'react-markdown';
-import { Conversation } from '../api/client';
+import { FiArrowLeft as MdArrowBack, FiChevronUp as MdArrowUpward, FiChevronDown as MdArrowDownward, FiCopy as MdContentCopy, FiLink as MdLink, FiMessageSquare as MdOutlineForum, FiPaperclip as MdAttachFile } from 'react-icons/fi';
 import { PlatformIcon } from './PlatformIcons';
+import { Conversation, ContentAttribute } from '../api/client';
+import { platformName, formatDate, snippetParts } from '../utils/presentation';
+import { markdownBlocks } from '../utils/markdownTables';
+import ContentBadges from './ContentBadges';
 import hljs from 'highlight.js/lib/core';
 import javascript from 'highlight.js/lib/languages/javascript';
 import typescript from 'highlight.js/lib/languages/typescript';
@@ -34,280 +38,96 @@ hljs.registerLanguage('sql', sql);
 hljs.registerLanguage('yaml', yaml);
 hljs.registerLanguage('yml', yaml);
 
-interface MessageViewerProps {
-  conversation: Conversation | null;
+interface Props {
+  conversation: Conversation | null; messageId: string | null; loading: boolean; error: string | null;
+  onRetry: () => void; onBack: () => void; onImport: () => void;
+  resultIndex: number | null; resultTotal: number; onStep: (delta: number) => void;
+  hasPrevious: boolean; hasNext: boolean; hasMoreResults: boolean; onLoadMore: () => void;
+  loadingMore: boolean; highlightSnippet?: string;
+  threadNavigation: ReactNode;
+  searching: boolean;
+  onFilterAttribute: (value: ContentAttribute) => void;
 }
-
-function formatDate(dateStr: string): string {
-  try {
-    const date = new Date(dateStr);
-    return date.toLocaleString('en-US', {
-      year: 'numeric',
-      month: 'short',
-      day: 'numeric',
-      hour: 'numeric',
-      minute: '2-digit',
-    });
-  } catch {
-    return dateStr;
-  }
+function CopyButton({ value, label = 'Copy', icon = false }: { value: string; label?: string; icon?: boolean }) {
+  const [status, setStatus] = useState('');
+  useEffect(() => { if (!status) return; const timer = setTimeout(() => setStatus(''), 2400); return () => clearTimeout(timer); }, [status]);
+  return <button className="copy-button" data-status={status || undefined} aria-label={status || label} title={label} onClick={async () => {
+    try { await navigator.clipboard.writeText(value); setStatus('Copied'); } catch { setStatus('Copy unavailable'); }
+  }}>{label.includes('link') ? <MdLink aria-hidden="true" /> : <MdContentCopy aria-hidden="true" />}<span aria-live="polite" className={icon && !status ? 'sr-only' : ''}>{status || label}</span></button>;
 }
-
-// Display names for platforms (backend uses internal names)
-function getPlatformDisplayName(platform: string): string {
-  const displayNames: Record<string, string> = {
-    openai: 'ChatGPT',
-    claude: 'Claude',
-    raycast: 'Raycast',
-  };
-  return displayNames[platform] || platform;
-}
-
-// Copy icon
-const CopyIcon = () => (
-  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-    <rect x="9" y="9" width="13" height="13" rx="2" ry="2" />
-    <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1" />
-  </svg>
-);
-
-// Check icon for copied state
-const CheckIcon = () => (
-  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-    <polyline points="20 6 9 17 4 12" />
-  </svg>
-);
-
-// Empty state icon
-const SelectConversationIcon = () => (
-  <svg className="empty-state-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5">
-    <path strokeLinecap="round" strokeLinejoin="round" d="M8.625 12a.375.375 0 11-.75 0 .375.375 0 01.75 0zm0 0H8.25m4.125 0a.375.375 0 11-.75 0 .375.375 0 01.75 0zm0 0H12m4.125 0a.375.375 0 11-.75 0 .375.375 0 01.75 0zm0 0h-.375M21 12c0 4.556-4.03 8.25-9 8.25a9.764 9.764 0 01-2.555-.337A5.972 5.972 0 015.41 20.97a5.969 5.969 0 01-.474-.065 4.48 4.48 0 00.978-2.025c.09-.457-.133-.901-.467-1.226C3.93 16.178 3 14.189 3 12c0-4.556 4.03-8.25 9-8.25s9 3.694 9 8.25z" />
-  </svg>
-);
-
-// Code block with copy button
-interface CodeBlockProps {
-  code: string;
-  language?: string;
-}
-
-function CodeBlock({ code, language }: CodeBlockProps) {
-  const [copied, setCopied] = useState(false);
-  const codeRef = useRef<HTMLElement>(null);
-
+function CodeBlock({ code, language }: { code: string; language?: string }) {
+  const ref = useRef<HTMLElement>(null);
   useEffect(() => {
-    if (codeRef.current && language) {
-      try {
-        const result = hljs.highlight(code, { language, ignoreIllegals: true });
-        codeRef.current.innerHTML = result.value;
-      } catch {
-        // If highlighting fails, just use plain text
-        codeRef.current.textContent = code;
-      }
-    }
+    if (!ref.current) return;
+    if (language && hljs.getLanguage(language)) ref.current.innerHTML = hljs.highlight(code, { language, ignoreIllegals: true }).value;
+    else ref.current.textContent = code;
   }, [code, language]);
-
-  const handleCopy = useCallback(async () => {
-    try {
-      await navigator.clipboard.writeText(code);
-      setCopied(true);
-      setTimeout(() => setCopied(false), 2000);
-    } catch (err) {
-      console.error('Failed to copy:', err);
-    }
-  }, [code]);
-
-  return (
-    <div className="code-block-wrapper">
-      <div className="code-header">
-        <span className="code-lang">{language || 'code'}</span>
-        <button
-          className={`code-copy ${copied ? 'copied' : ''}`}
-          onClick={handleCopy}
-          type="button"
-        >
-          {copied ? <CheckIcon /> : <CopyIcon />}
-          <span>{copied ? 'Copied!' : 'Copy'}</span>
-        </button>
-      </div>
-      <pre>
-        <code ref={codeRef} className={language ? `language-${language}` : ''}>
-          {code}
-        </code>
-      </pre>
-    </div>
-  );
+  return <div className="code-block-wrapper"><div className="code-header"><span>{language || 'Plain text'}</span><CopyButton value={code} label="Copy code" /></div><pre tabIndex={0} aria-label={`${language || 'Plain text'} code`}><code ref={ref}>{code}</code></pre></div>;
 }
-
-// Clean up OpenAI citation markers and other artifacts
-function cleanContent(text: string): string {
-  // Remove OpenAI citation markers - they use Private Use Area Unicode:
-  // \ue200 (opening), \ue201 (closing), \ue202 (separator like †)
-  // Pattern: \ue200cite\ue202turn0search1\ue201
-  return text
-    .replace(/\ue200[^\ue201]*\ue201/g, '')  // Private Use Area markers
-    .replace(/【[^】]*】/g, '')                // CJK bracket markers (fallback)
-    .replace(/  +/g, ' ')
-    .trim();
+function highlighted(children: ReactNode, terms: string[]): ReactNode {
+  if (!terms.length) return children;
+  const pattern = new RegExp(`(${terms.map(term => term.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')).join('|')})`, 'gi');
+  return Children.map(children, child => {
+    if (typeof child === 'string') return child.split(pattern).map((part, index) => index % 2 ? <mark key={index}>{part}</mark> : part);
+    if (isValidElement<{children?: ReactNode}>(child) && child.type !== 'code' && child.type !== 'pre') return cloneElement(child, {}, highlighted(child.props.children, terms));
+    return child;
+  });
 }
-
-// Normalize common bullet patterns to markdown
-function normalizeToMarkdown(text: string): string {
-  return text
-    // Convert tab-indented bullets (▪, •, -, *) to markdown list items
-    .replace(/^[ \t]*[▪•]\t*/gm, '- ')
-    .replace(/^[ \t]*[-*]\t+/gm, '- ')
-    // Convert numbered lists with tabs to markdown (1.\t -> 1. )
-    .replace(/^[ \t]*(\d+\.)\t+/gm, '$1 ')
-    // Normalize multiple spaces/tabs after list markers
-    .replace(/^(- |\d+\. )[ \t]+/gm, '$1')
-    // Collapse 3+ consecutive newlines to 2 (single paragraph break)
-    .replace(/\n{3,}/g, '\n\n');
+function MessageContent({ content, terms }: { content: string; terms: string[] }) {
+  const cleaned = content.replace(/\ue200[^\ue201]*\ue201/g, '');
+  const render = (text: string) => <ReactMarkdown components={{
+    code({ className, children, node }) {
+      const language = /language-([\w+-]+)/.exec(className || '')?.[1];
+      return language || node?.position?.start.line !== node?.position?.end.line || String(children).includes('\n')
+        ? <CodeBlock code={String(children).replace(/\n$/, '')} language={language} /> : <code>{children}</code>;
+    },
+    pre({ children }) { return <>{children}</>; },
+    p({ children }) { return <p>{highlighted(children, terms)}</p>; },
+    li({ children }) { return <li>{highlighted(children, terms)}</li>; },
+    h1({ children }) { return <h3>{highlighted(children, terms)}</h3>; },
+    h2({ children }) { return <h3>{highlighted(children, terms)}</h3>; },
+    h3({ children }) { return <h4>{highlighted(children, terms)}</h4>; },
+    img({ src, alt }) { return <a className="attachment-inline" href={src}>{alt || 'Referenced image'} · open source</a>; },
+  }}>{text}</ReactMarkdown>;
+  return <div className="message-content">{markdownBlocks(cleaned).map((block, index) => block.kind === 'markdown'
+    ? <div key={index}>{render(block.content)}</div>
+    : <div key={index} className="table-scroll" tabIndex={0} role="region" aria-label="Message table, scroll horizontally if needed"><table><thead><tr>{block.header.map((cell, n) => <th scope="col" key={n} style={{ textAlign: block.align[n] }}>{render(cell)}</th>)}</tr></thead><tbody>{block.rows.map((row, r) => <tr key={r}>{row.map((cell, n) => <td key={n} style={{ textAlign: block.align[n] }}>{render(cell)}</td>)}</tr>)}</tbody></table></div>)}</div>;
 }
-
-// Parse and render message content with markdown support
-function MessageContent({ content }: { content: string }) {
-  // Clean the content first (remove citation markers etc.)
-  const cleaned = cleanContent(content);
-  // Normalize bullet patterns to standard markdown
-  const normalized = normalizeToMarkdown(cleaned);
-
-  return (
-    <div className="message-content">
-      <ReactMarkdown
-        components={{
-          // Use our custom CodeBlock for fenced code blocks
-          code({ className, children, ...props }) {
-            const match = /language-(\w+)/.exec(className || '');
-            const isBlock = props.node?.position?.start.line !== props.node?.position?.end.line ||
-              String(children).includes('\n');
-
-            if (isBlock || match) {
-              return (
-                <CodeBlock
-                  code={String(children).replace(/\n$/, '')}
-                  language={match?.[1]}
-                />
-              );
-            }
-            // Inline code
-            return <code className={className} {...props}>{children}</code>;
-          },
-          // Remove the wrapping <pre> since CodeBlock handles it
-          pre({ children }) {
-            return <>{children}</>;
-          },
-        }}
-      >
-        {normalized}
-      </ReactMarkdown>
-    </div>
-  );
-}
-
-// Copy button for entire message
-function MessageCopyButton({ content }: { content: string }) {
-  const [copied, setCopied] = useState(false);
-
-  const handleCopy = useCallback(async () => {
-    try {
-      await navigator.clipboard.writeText(content);
-      setCopied(true);
-      setTimeout(() => setCopied(false), 2000);
-    } catch (err) {
-      console.error('Failed to copy:', err);
-    }
-  }, [content]);
-
-  return (
-    <button
-      className={`message-copy-btn ${copied ? 'copied' : ''}`}
-      onClick={handleCopy}
-      type="button"
-      title="Copy message"
-    >
-      {copied ? <CheckIcon /> : <CopyIcon />}
-    </button>
-  );
-}
-
-function MessageViewer({ conversation }: MessageViewerProps) {
-  const messagesEndRef = useRef<HTMLDivElement>(null);
-
-  // Scroll to top when conversation changes
+export default function MessageViewer(props: Props) {
+  const { conversation, messageId, loading, error, resultIndex, resultTotal } = props;
+  const scroll = useRef<HTMLDivElement>(null);
+  const heading = useRef<HTMLHeadingElement>(null);
   useEffect(() => {
-    const container = messagesEndRef.current?.parentElement;
-    if (container) {
-      container.scrollTop = 0;
-    }
-  }, [conversation?.id]);
+    if (loading || error || !conversation) return;
+    const container = scroll.current;
+    if (!container) return;
+    const target = messageId ? Array.from(container.querySelectorAll<HTMLElement>('[data-message-id]')).find(node => node.dataset.messageId === messageId) : null;
+    container.scrollTop = target ? container.scrollTop + target.getBoundingClientRect().top - container.getBoundingClientRect().top - 20 : 0;
+    (target || heading.current)?.focus({ preventScroll: true });
+  }, [conversation, messageId, loading, error]);
 
-  if (!conversation) {
-    return (
-      <div className="conversation-viewer">
-        <div className="empty-state">
-          <SelectConversationIcon />
-          <h3>Select a conversation</h3>
-          <p>Click on a conversation to view its messages</p>
-        </div>
-      </div>
-    );
-  }
-
+  const back = <button className="back-button" onClick={props.onBack}><MdArrowBack aria-hidden="true" />Back to {props.searching ? 'results' : 'archive'}</button>;
+  if (loading || error) return <section className="conversation-viewer" aria-label="Conversation"><div className="reader-toolbar">{back}</div><div className="empty-state" role={error ? 'alert' : 'status'}>{error ? <><h2>Couldn’t open this conversation</h2><p>{error}</p><button onClick={props.onRetry}>Try again</button></> : <><span className="loading-spinner" /><p>Opening conversation…</p></>}</div></section>;
+  if (!conversation) return <section className="conversation-viewer empty-reader"><div className="empty-state"><MdOutlineForum className="empty-icon" /><span className="eyebrow">YOUR CONVERSATIONS, TOGETHER</span><h2>A good answer is worth finding again.</h2><p>Search your archive or choose a conversation to pick up where you left off.</p><button onClick={props.onImport}>Import conversations</button><span className="empty-tip">Press <kbd>/</kbd> to start searching</span></div></section>;
   const messages = conversation.messages || [];
-  const platform = conversation.platform;
-
-  return (
-    <div className="conversation-viewer">
-      <div className="conversation-header">
-        <h2 className="conversation-title">
-          {conversation.title || 'Untitled Conversation'}
-        </h2>
-        <div className="conversation-meta">
-          <span className={`platform-badge ${platform}`}>
-            <PlatformIcon platform={platform} size={12} />
-            {getPlatformDisplayName(platform)}
-          </span>
-          <span>{formatDate(conversation.created_at)}</span>
-          {conversation.model && <span>Model: {conversation.model}</span>}
-          <span>{messages.length} messages</span>
-        </div>
-      </div>
-
-      <div className="messages-container">
-        {messages.map((msg, index) => (
-          <div
-            key={msg.id}
-            className={`message ${msg.role} ${msg.role === 'assistant' ? platform : ''}`}
-            style={{
-              animationDelay: index < 10 ? `${index * 50}ms` : '500ms',
-            }}
-          >
-            <MessageCopyButton content={msg.content} />
-            <div className="message-role">
-              {msg.role === 'user' ? 'You' : getPlatformDisplayName(platform)}
-            </div>
-            <MessageContent content={msg.content} />
-            {msg.media && msg.media.length > 0 && (
-              <div className="media-indicator">
-                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                  <rect x="3" y="3" width="18" height="18" rx="2" ry="2" />
-                  <circle cx="8.5" cy="8.5" r="1.5" />
-                  <polyline points="21 15 16 10 5 21" />
-                </svg>
-                {msg.media.map((m, idx) => (
-                  <span key={idx} title={m.original_path}>
-                    {m.filename || m.media_type}
-                  </span>
-                ))}
-              </div>
-            )}
-          </div>
-        ))}
-        <div ref={messagesEndRef} />
-      </div>
+  const terms = [...new Set(snippetParts(props.highlightSnippet || '').filter(part => part.highlight && part.text).map(part => part.text))];
+  const baseLink = `${window.location.origin}/c/${encodeURIComponent(conversation.id)}`;
+  return <section className="conversation-viewer" aria-label="Conversation">
+    <div className="conversation-header">
+      <div className="thread-toolbar">{back}{props.threadNavigation}</div>
+      <div className="conversation-heading"><h2 ref={heading} tabIndex={-1}>{conversation.title || 'Untitled conversation'}</h2><CopyButton value={baseLink} label="Copy link" /></div>
+      <div className="conversation-meta"><span className={`source-badge ${conversation.platform}`}><PlatformIcon platform={conversation.platform} size={13} />{platformName(conversation.platform)}</span>{conversation.model && <span>{conversation.model}</span>}<span>{formatDate(conversation.created_at)}</span><span>{messages.length} messages</span></div>
+      <ContentBadges values={conversation.attributes} onFilter={props.onFilterAttribute} />
+      {resultIndex !== null && <div className="reader-toolbar match-toolbar"><span className="match-position" role="status">Match <strong>{resultIndex + 1} of {resultTotal.toLocaleString()}</strong></span><div className="match-actions"><button className="icon-button" aria-label="Previous matching result" disabled={!props.hasPrevious} onClick={() => props.onStep(-1)}><MdArrowUpward /></button><button className="icon-button" aria-label="Next matching result" disabled={!props.hasNext} onClick={() => props.onStep(1)}><MdArrowDownward /></button>{!props.hasNext && props.hasMoreResults && <button disabled={props.loadingMore} onClick={props.onLoadMore}>{props.loadingMore ? 'Loading…' : 'Load more matches'}</button>}</div></div>}
     </div>
-  );
+    <div className="messages-container" ref={scroll}>
+      {messageId && !messages.some(message => message.id === messageId) && <p className="notice" role="status">This message is no longer available. Showing the conversation instead.</p>}
+      {messages.map((message, index) => <article tabIndex={-1} key={message.id} data-message-id={message.id} className={`message ${message.role} ${message.id === messageId ? 'matched-message' : ''}`} aria-label={`Message ${index + 1}, ${message.role === 'user' ? 'You' : message.role === 'assistant' ? platformName(conversation.platform) : message.role}`}>
+        <div className="message-heading"><div className="message-author"><span className={`message-avatar ${message.role === 'user' ? 'you' : conversation.platform}`}>{message.role === 'user' ? 'Y' : <PlatformIcon platform={conversation.platform} size={16} />}</span>{message.role === 'user' ? 'You' : message.role === 'assistant' ? <>{platformName(conversation.platform)}</> : message.role}<span className="message-number">{message.created_at ? formatDate(message.created_at) : `Message ${index + 1}`}</span></div><div className="message-actions"><CopyButton value={message.content} label="Copy message" /><CopyButton value={`${baseLink}?message=${encodeURIComponent(message.id)}`} label="Copy message link" icon /></div></div>
+        <MessageContent content={message.content} terms={terms} />
+        {message.media?.map(media => <div className="attachment" key={media.id}><MdAttachFile aria-hidden="true" /><div><strong>{media.filename || media.original_path.split('/').pop() || 'Attachment'}</strong><small>{media.media_type} · Reference only; file contents aren’t available in this archive.</small></div></div>)}
+      </article>)}
+      <div className="conversation-end">{messages.length ? 'End of conversation' : 'This conversation has no messages.'}</div>
+    </div>
+  </section>;
 }
-
-export default MessageViewer;

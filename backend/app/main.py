@@ -2,7 +2,7 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
 from .database import init_db
-from .routers import search, conversations, imports
+from .routers import search, conversations, imports, views
 
 app = FastAPI(
     title="Central Chat",
@@ -23,6 +23,7 @@ app.add_middleware(
 app.include_router(search.router)
 app.include_router(conversations.router)
 app.include_router(imports.router)
+app.include_router(views.router)
 
 
 @app.on_event("startup")

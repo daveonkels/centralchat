@@ -1,397 +1,79 @@
-import { useRef, useCallback, useEffect, useState } from 'react';
-import { useVirtualizer } from '@tanstack/react-virtual';
-import { SearchResult, Conversation } from '../api/client';
+import { CSSProperties, Fragment, useEffect, useRef } from 'react';
+import { FiMessageSquare, FiArrowRight, FiSearch, FiInbox } from 'react-icons/fi';
+import { SearchResult, Conversation, ContentAttribute } from '../api/client';
 import { PlatformIcon } from './PlatformIcons';
+import { snippetParts, platformName, formatDate } from '../utils/presentation';
+import ContentBadges from './ContentBadges';
+import { DEFAULT_DISPLAY, DisplaySettings, browseMetadataColumns, displayGroup } from '../utils/display';
+import './display.css';
 
-interface ConversationListProps {
-  results: SearchResult[];
-  conversations: Conversation[];
-  loading: boolean;
-  selectedId?: string;
-  selectedIndex?: number | null;
-  onSelect: (id: string, index: number) => void;
-  isSearchMode: boolean;
-  suggestions?: string[];
-  onSuggestionSelect?: (value: string) => void;
-  hasMore?: boolean;
-  loadingMore?: boolean;
-  onLoadMore?: () => void;
+interface Props {
+  display?: DisplaySettings; sort?: string;
+  results: SearchResult[]; conversations: Conversation[]; loading: boolean;
+  hasFilters: boolean; onFilterAttribute: (value: ContentAttribute) => void;
+  selectedId?: string; selectedIndex?: number | null;
+  onSelect: (id: string, index: number, message: string | null) => void;
+  isSearchMode: boolean; error: string | null; hasMore: boolean; loadingMore: boolean;
+  onLoadMore: () => void; onRetry: () => void; onReset: () => void; onImport: () => void;
 }
-
-const HIGHLIGHT_START = '__CC_HL_START__';
-const HIGHLIGHT_END = '__CC_HL_END__';
-
-// Clean up OpenAI citation markers from text/HTML
-function cleanContent(text: string): string {
-  // OpenAI uses Private Use Area Unicode: \ue200 (open), \ue201 (close), \ue202 (†)
-  return text
-    .replace(/\ue200[^\ue201]*\ue201/g, '')  // Private Use Area markers
-    .replace(/【[^】]*】/g, '')                // CJK bracket markers (fallback)
-    .replace(/  +/g, ' ');
+function Snippet({ value }: { value: string }) {
+  const plain = value.replace(/\|?\s*:?-{3,}:?\s*(?=\||$)/g, '').replace(/\|/g, ' · ').replace(/[`*#]/g, '');
+  return <span className="result-snippet">{snippetParts(plain).map((part, n) => part.highlight ? <mark key={n}>{part.text}</mark> : part.text)}</span>;
 }
-
-function renderSnippet(snippet: string) {
-  const cleaned = cleanContent(snippet);
-  if (!cleaned) return null;
-
-  const nodes: JSX.Element[] = [];
-  let remaining = cleaned;
-  let key = 0;
-
-  while (remaining.length > 0) {
-    const startIndex = remaining.indexOf(HIGHLIGHT_START);
-    if (startIndex === -1) {
-      nodes.push(<span key={`t-${key++}`}>{remaining}</span>);
-      break;
-    }
-
-    if (startIndex > 0) {
-      nodes.push(<span key={`t-${key++}`}>{remaining.slice(0, startIndex)}</span>);
-    }
-
-    const afterStart = remaining.slice(startIndex + HIGHLIGHT_START.length);
-    const endIndex = afterStart.indexOf(HIGHLIGHT_END);
-    if (endIndex === -1) {
-      nodes.push(<span key={`t-${key++}`}>{afterStart}</span>);
-      break;
-    }
-
-    nodes.push(<mark key={`m-${key++}`}>{afterStart.slice(0, endIndex)}</mark>);
-    remaining = afterStart.slice(endIndex + HIGHLIGHT_END.length);
-  }
-
-  return nodes;
+function Source({ platform }: { platform: string }) {
+  return <span className={`source-badge ${platform}`}><PlatformIcon platform={platform} size={13} /><span>{platformName(platform)}</span></span>;
 }
-
-function formatDate(dateStr: string): string {
-  try {
-    const date = new Date(dateStr);
-    return date.toLocaleDateString('en-US', {
-      year: 'numeric',
-      month: 'short',
-      day: 'numeric',
-    });
-  } catch {
-    return dateStr;
-  }
-}
-
-// Display names for platforms (backend uses internal names)
-function getPlatformDisplayName(platform: string): string {
-  const displayNames: Record<string, string> = {
-    openai: 'ChatGPT',
-    claude: 'Claude',
-    raycast: 'Raycast',
-  };
-  return displayNames[platform] || platform;
-}
-
-function PlatformBadge({ platform }: { platform: string }) {
-  return (
-    <span className={`platform-badge ${platform}`}>
-      <PlatformIcon platform={platform} size={12} />
-      {getPlatformDisplayName(platform)}
-    </span>
-  );
-}
-
-// Loading skeleton component
-function LoadingSkeleton() {
-  return (
-    <>
-      {[...Array(8)].map((_, i) => (
-        <div key={i} className="result-skeleton">
-          <div className="skeleton result-skeleton-badge" />
-          <div className="skeleton result-skeleton-title" />
-          <div className="skeleton result-skeleton-snippet" />
-          <div className="skeleton result-skeleton-snippet" style={{ width: '60%' }} />
-          <div className="skeleton result-skeleton-meta" />
-        </div>
-      ))}
-    </>
-  );
-}
-
-// Empty state icons
-const SearchEmptyIcon = () => (
-  <svg className="empty-state-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5">
-    <path strokeLinecap="round" strokeLinejoin="round" d="M21 21l-5.197-5.197m0 0A7.5 7.5 0 105.196 5.196a7.5 7.5 0 0010.607 10.607z" />
-  </svg>
-);
-
-const ConversationEmptyIcon = () => (
-  <svg className="empty-state-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5">
-    <path strokeLinecap="round" strokeLinejoin="round" d="M20.25 8.511c.884.284 1.5 1.128 1.5 2.097v4.286c0 1.136-.847 2.1-1.98 2.193-.34.027-.68.052-1.02.072v3.091l-3-3c-1.354 0-2.694-.055-4.02-.163a2.115 2.115 0 01-.825-.242m9.345-8.334a2.126 2.126 0 00-.476-.095 48.64 48.64 0 00-8.048 0c-1.131.094-1.976 1.057-1.976 2.192v4.286c0 .837.46 1.58 1.155 1.951m9.345-8.334V6.637c0-1.621-1.152-3.026-2.76-3.235A48.455 48.455 0 0011.25 3c-2.115 0-4.198.137-6.24.402-1.608.209-2.76 1.614-2.76 3.235v6.226c0 1.621 1.152 3.026 2.76 3.235.577.075 1.157.14 1.74.194V21l4.155-4.155" />
-  </svg>
-);
-
-function ConversationList({
-  results,
-  conversations,
-  loading,
-  selectedId,
-  selectedIndex,
-  onSelect,
-  isSearchMode,
-  suggestions = [],
-  onSuggestionSelect,
-  hasMore = false,
-  loadingMore = false,
-  onLoadMore,
-}: ConversationListProps) {
-  const parentRef = useRef<HTMLDivElement>(null);
-  const [animatedItems, setAnimatedItems] = useState<Set<string>>(new Set());
-
-  // Determine items to render
+export default function ConversationList(props: Props) {
+  const { results, conversations, loading, selectedIndex, onSelect, isSearchMode, error, hasMore, loadingMore } = props;
+  const display = props.display || DEFAULT_DISPLAY;
+  const sort = props.sort || 'relevance';
+  const scroll = useRef<HTMLDivElement>(null);
   const items = isSearchMode ? results : conversations;
-
-  // Get unique key for item
-  const getItemKey = useCallback((item: SearchResult | Conversation, index: number) => {
-    if ('message_id' in item) {
-      return `${item.conversation_id}-${item.message_id || index}`;
-    }
-    return item.id;
-  }, []);
-
-  // Reset animations when items change
-  useEffect(() => {
-    setAnimatedItems(new Set());
-  }, [isSearchMode, items.length]);
-
-  // Virtualizer setup
-  const virtualizer = useVirtualizer({
-    count: items.length,
-    getScrollElement: () => parentRef.current,
-    estimateSize: useCallback((index: number) => {
-      // Search results with snippets are taller
-      if (isSearchMode && results[index]?.snippet) {
-        return 110;
-      }
-      return 88;
-    }, [isSearchMode, results]),
-    overscan: 5,
+  const grouped = new Map<string, { hit: SearchResult; index: number }[]>();
+  results.forEach((hit, index) => {
+    const matches = grouped.get(hit.conversation_id);
+    if (matches) matches.push({ hit, index }); else grouped.set(hit.conversation_id, [{ hit, index }]);
   });
-
-  const virtualItems = virtualizer.getVirtualItems();
-
-  useEffect(() => {
-    if (isSearchMode || !onLoadMore || !hasMore || loadingMore) return;
-    if (virtualItems.length === 0) return;
-    const lastItem = virtualItems[virtualItems.length - 1];
-    if (lastItem.index >= items.length - 6) {
-      onLoadMore();
-    }
-  }, [hasMore, isSearchMode, items.length, loadingMore, onLoadMore, virtualItems]);
-
-  useEffect(() => {
-    if (
-      selectedIndex === null ||
-      selectedIndex === undefined ||
-      selectedIndex < 0 ||
-      selectedIndex >= items.length
-    ) {
-      return;
-    }
-
-    virtualizer.scrollToIndex(selectedIndex, { align: 'auto' });
-  }, [selectedIndex, items.length, virtualizer]);
-
-  // Mark item as animated
-  const markAnimated = useCallback((key: string) => {
-    setAnimatedItems(prev => {
-      const next = new Set(prev);
-      next.add(key);
-      return next;
-    });
-  }, []);
-
-  if (loading) {
-    return (
-      <div className="results-list">
-        <div className="results-header">
-          <div className="loading-spinner" />
-          <span>Loading...</span>
-        </div>
-        <div className="results-scroll">
-          <LoadingSkeleton />
-        </div>
-      </div>
-    );
-  }
-
-  // Search mode: show search results
-  if (isSearchMode) {
-    if (results.length === 0) {
-      return (
-        <div className="results-list">
-          <div className="results-header">Search results</div>
-          <div className="empty-state">
-            <SearchEmptyIcon />
-            <h3>No results found</h3>
-            <p>Try different keywords or remove filters</p>
-            {suggestions.length > 0 && (
-              <div className="search-suggestions">
-                <div className="search-suggestions-label">Suggested queries</div>
-                <div className="search-suggestions-list">
-                  {suggestions.map((suggestion) => (
-                    <button
-                      key={suggestion}
-                      className="search-suggestion-chip"
-                      onClick={() => onSuggestionSelect?.(suggestion)}
-                      type="button"
-                    >
-                      {suggestion}
-                    </button>
-                  ))}
-                </div>
-              </div>
-            )}
-          </div>
-        </div>
-      );
-    }
-
-    return (
-      <div className="results-list">
-        <div className="results-header">
-          <strong>{results.length}</strong> result{results.length !== 1 ? 's' : ''}
-        </div>
-        <div ref={parentRef} className="results-scroll">
-          <div
-            className="results-virtual"
-            style={{ height: `${virtualizer.getTotalSize()}px` }}
-          >
-            {virtualItems.map((virtualRow) => {
-              const result = results[virtualRow.index];
-              const key = getItemKey(result, virtualRow.index);
-              const isAnimated = animatedItems.has(key);
-              const shouldAnimate = !isAnimated && virtualRow.index < 20;
-              const isSelected = selectedIndex !== null && selectedIndex !== undefined
-                ? selectedIndex === virtualRow.index
-                : selectedId === result.conversation_id;
-
-              if (shouldAnimate) {
-                // Schedule animation mark after render
-                requestAnimationFrame(() => markAnimated(key));
-              }
-
-              return (
-                <div
-                  key={key}
-                  className={`result-item ${isSelected ? `selected ${result.platform}` : ''} ${shouldAnimate ? 'animate-in' : ''}`}
-                  style={{
-                    position: 'absolute',
-                    top: 0,
-                    left: 0,
-                    width: '100%',
-                    height: `${virtualRow.size}px`,
-                    transform: `translateY(${virtualRow.start}px)`,
-                    animationDelay: shouldAnimate ? `${virtualRow.index * 30}ms` : undefined,
-                  }}
-                  onClick={() => onSelect(result.conversation_id, virtualRow.index)}
-                >
-                  <div className="result-title">
-                    <PlatformBadge platform={result.platform} />
-                    <span>{result.conversation_title || 'Untitled'}</span>
-                  </div>
-                  <div className="result-snippet">
-                    {renderSnippet(result.snippet)}
-                  </div>
-                  <div className="result-meta">
-                    {result.role && <span>{result.role}</span>}
-                    <span>{formatDate(result.conversation_date)}</span>
-                  </div>
-                </div>
-              );
-            })}
-          </div>
-        </div>
-      </div>
-    );
-  }
-
-  // Browse mode: show conversations
-  if (conversations.length === 0) {
-    return (
-      <div className="results-list">
-        <div className="results-header">Conversations</div>
-        <div className="empty-state">
-          <ConversationEmptyIcon />
-          <h3>No conversations yet</h3>
-          <p>Import your chat exports to get started</p>
-          <div className="empty-steps">
-            <div className="empty-steps-title">Get started</div>
-            <ol>
-              <li>Export chats from ChatGPT, Claude, or Raycast.</li>
-              <li>Drop export folders into <code>imports/</code>.</li>
-              <li>Click Import to index and search.</li>
-            </ol>
-            <div className="empty-steps-files">
-              Expected files: <code>conversations.json</code>, <code>raycast_ai_chats.json</code>
+  const groups = Array.from(grouped.entries());
+  const headingForHit = (hit: SearchResult) => displayGroup(display.groupBy, hit.platform, hit.message_date || hit.conversation_date, true, sort);
+  const columns = { '--display-metadata-columns': browseMetadataColumns(display) } as CSSProperties;
+  useEffect(() => { if (loading && scroll.current) scroll.current.scrollTop = 0; }, [loading]);
+  return <div className="results-scroll display-results" style={columns} ref={scroll} aria-busy={loading || loadingMore} onKeyDown={event => {
+    if (event.key !== 'ArrowDown' && event.key !== 'ArrowUp') return;
+    const buttons = Array.from(scroll.current?.querySelectorAll<HTMLButtonElement>('[data-result-index]') || []).filter(button => button.getClientRects().length > 0);
+    const index = buttons.indexOf(event.target as HTMLButtonElement);
+    if (index < 0) return;
+    event.preventDefault(); buttons[Math.max(0, Math.min(buttons.length - 1, index + (event.key === 'ArrowDown' ? 1 : -1)))]?.focus();
+  }}>
+    {error && <div className="error-state" role="alert"><h3>Couldn’t load the archive</h3><p>{error}</p><button onClick={props.onRetry}>Try again</button></div>}
+    {loading ? <div className="list-skeleton" aria-label="Loading conversations">{Array.from({length: 8}, (_, i) => <div className="skeleton-row" key={i}><span /><span /></div>)}</div> : !error && items.length === 0 ?
+      <div className="empty-state"><div className="empty-symbol">{isSearchMode ? <FiSearch /> : <FiInbox />}</div><h3>{(isSearchMode || props.hasFilters) ? 'No conversations found' : 'A home for your conversations'}</h3><p>{(isSearchMode || props.hasFilters) ? 'Try different words or broaden your filters.' : 'Bring your ChatGPT, Claude, and Raycast exports into one searchable archive.'}</p><button className="primary-button" onClick={isSearchMode || props.hasFilters ? props.onReset : props.onImport}>{isSearchMode || props.hasFilters ? 'Clear search & filters' : 'Import conversations'}</button></div> : !loading && <>
+      {!isSearchMode && <div className="list-columns" aria-hidden="true"><span>Conversation</span>{display.showSource && <span className="column-source">Source</span>}{display.showCount && <span className="column-count">Messages</span>}{display.showDate && <span className="column-date">Created</span>}</div>}
+      <ul className={`conversation-list ${isSearchMode ? 'search-results' : 'browse-results'}`} aria-label={isSearchMode ? 'Search results' : 'Conversations'}>
+        {isSearchMode ? groups.map(([id, matches], groupIndex) => {
+          const primary = matches.find(item => item.index === selectedIndex) || matches[0];
+          const { hit, index } = primary;
+          const selected = selectedIndex != null ? matches.some(match => match.index === selectedIndex) : props.selectedId === id;
+          const others = matches.filter(item => item.index !== index);
+          const group = headingForHit(matches[0].hit);
+          const previousGroup = groupIndex > 0 ? headingForHit(groups[groupIndex - 1][1][0].hit) : null;
+          return <Fragment key={id}>{group && group.key !== previousGroup?.key && <li className="month-heading"><h2>{group.label}</h2></li>}<li className={selected ? 'selected-group' : ''}>
+            <div className={`result-item search-item ${selected ? 'selected' : ''}`}>
+              <FiMessageSquare className="row-icon" aria-hidden="true" /><span className="result-main"><button className="row-open result-title" data-result-index={index} aria-current={selected ? 'true' : undefined} onClick={() => onSelect(id, index, hit.message_id)}>{hit.conversation_title || 'Untitled conversation'}</button>{display.showPreview && <Snippet value={hit.snippet || hit.conversation_title || ''} />}<span className="result-meta">{display.showSource && <Source platform={hit.platform} />}{display.showDate && <span>{formatDate(hit.conversation_date)}</span>}{display.showCount && <span>{hit.conversation_matches || matches.length} matches</span>}{display.showContent && <ContentBadges values={hit.attributes} compact onFilter={props.onFilterAttribute} />}</span></span><FiArrowRight className="row-arrow" aria-hidden="true" />
             </div>
-          </div>
-        </div>
-      </div>
-    );
-  }
-
-  return (
-    <div className="results-list">
-      <div className="results-header">
-        <strong>{hasMore ? `${conversations.length}+` : conversations.length}</strong>{' '}
-        conversation{conversations.length !== 1 ? 's' : ''}
-        {loadingMore && <span className="results-loading-more">Loading more...</span>}
-      </div>
-      <div ref={parentRef} className="results-scroll">
-        <div
-          className="results-virtual"
-          style={{ height: `${virtualizer.getTotalSize()}px` }}
-        >
-          {virtualItems.map((virtualRow) => {
-            const conv = conversations[virtualRow.index];
-            const key = getItemKey(conv, virtualRow.index);
-            const isAnimated = animatedItems.has(key);
-            const shouldAnimate = !isAnimated && virtualRow.index < 20;
-            const isSelected = selectedIndex !== null && selectedIndex !== undefined
-              ? selectedIndex === virtualRow.index
-              : selectedId === conv.id;
-
-            if (shouldAnimate) {
-              requestAnimationFrame(() => markAnimated(key));
-            }
-
-            return (
-              <div
-                key={conv.id}
-                className={`result-item ${isSelected ? `selected ${conv.platform}` : ''} ${shouldAnimate ? 'animate-in' : ''}`}
-                style={{
-                  position: 'absolute',
-                  top: 0,
-                  left: 0,
-                  width: '100%',
-                  height: `${virtualRow.size}px`,
-                  transform: `translateY(${virtualRow.start}px)`,
-                  animationDelay: shouldAnimate ? `${virtualRow.index * 30}ms` : undefined,
-                }}
-                onClick={() => onSelect(conv.id, virtualRow.index)}
-              >
-                <div className="result-title">
-                  <PlatformBadge platform={conv.platform} />
-                  <span>{conv.title || 'Untitled'}</span>
-                </div>
-                <div className="result-meta">
-                  {conv.message_count !== undefined && (
-                    <span>{conv.message_count} messages</span>
-                  )}
-                  <span>{formatDate(conv.created_at)}</span>
-                </div>
-              </div>
-            );
-          })}
-        </div>
-      </div>
-    </div>
-  );
+            {others.length > 0 && <details className="additional-matches"><summary>{others.length} more loaded matches</summary>{others.map(({hit: other, index: n}) => <button key={other.message_id || 'title'} data-result-index={n} onClick={() => onSelect(id, n, other.message_id)}><span className="result-meta">{!display.showPreview && `Match ${n + 1} · `}{other.message_id ? other.role === 'user' ? 'You' : platformName(other.platform) : 'Conversation title'}</span>{display.showPreview && <Snippet value={other.snippet || other.conversation_title || ''} />}</button>)}</details>}
+          </li></Fragment>;
+        }) : conversations.map((conv, index) => {
+          const selected = selectedIndex != null ? selectedIndex === index : props.selectedId === conv.id;
+          const group = displayGroup(display.groupBy, conv.platform, conv.created_at);
+          const previous = index > 0 ? conversations[index - 1] : null;
+          const previousGroup = previous ? displayGroup(display.groupBy, previous.platform, previous.created_at) : null;
+          return <Fragment key={conv.id}>{group && group.key !== previousGroup?.key && <li className="month-heading"><h2>{group.label}</h2></li>}<li><div className={`result-item browse-item ${selected ? 'selected' : ''} ${display.showSource ? '' : 'without-source'}`}>
+            <FiMessageSquare className="row-icon" aria-hidden="true" /><span className="result-subject"><button className="row-open result-title" data-result-index={index} aria-current={selected ? 'true' : undefined} onClick={() => onSelect(conv.id, index, null)}>{conv.title || 'Untitled conversation'}</button>{display.showContent && <ContentBadges values={conv.attributes} compact onFilter={props.onFilterAttribute} />}</span>{display.showSource && <Source platform={conv.platform} />}{display.showCount && <span className="row-count">{conv.message_count ?? 0}<span className="mobile-message-label"> messages</span></span>}{display.showDate && <time className="row-date" dateTime={conv.created_at}>{formatDate(conv.created_at)}</time>}<FiArrowRight className="row-arrow" aria-hidden="true" />
+          </div></li></Fragment>;
+        })}
+      </ul>
+    </>}
+    {!loading && !error && items.length > 0 && <div className="list-pagination">{hasMore ? <button onClick={props.onLoadMore} disabled={loadingMore}>{loadingMore ? 'Loading…' : `Load 50 more ${isSearchMode ? 'matches' : 'conversations'}`}</button> : <span>All {items.length.toLocaleString()} {isSearchMode ? items.length === 1 ? 'match' : 'matches' : items.length === 1 ? 'conversation' : 'conversations'} shown</span>}</div>}
+  </div>;
 }
-
-export default ConversationList;

@@ -1,208 +1,104 @@
-# Central Chat - Because that brilliant explanation ChatGPT or Claude gave you three months ago shouldn't be lost forever.
+# Central Chat
 
-![Central Chat](docs/centralchat-hero.png)
+**A good answer is worth finding again.**
 
-[![License](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
-[![Docker](https://img.shields.io/badge/Docker-Ready-2496ED?logo=docker&logoColor=white)](https://docs.docker.com/get-docker/)
-[![Python](https://img.shields.io/badge/Python-3.10+-3776AB?logo=python&logoColor=white)](https://www.python.org/)
-[![TypeScript](https://img.shields.io/badge/TypeScript-5.0+-3178C6?logo=typescript&logoColor=white)](https://www.typescriptlang.org/)
+Search your ChatGPT, Claude, and Raycast conversations in one personal archive.
+Import your exports, find the message you remember, and keep useful searches a
+click away. Run Central Chat on your computer or on a server you control.
 
-Grab your data archives and get one search bar for everything. Every AI conversation. Zero cloud dependencies. Your conversations are scattered across ChatGPT, Claude, and Raycast—Central Chat brings them together in a single, fast, searchable interface that runs entirely on your machine. **Your data never leaves your computer.**
+[Try the interactive demo](https://centralchat.fyi) · [Get started](docs/getting-started.md) · [MIT license](LICENSE)
 
-## Features
+![Central Chat archive in dark mode, showing fictional conversations and content badges](docs/screenshots/archive-dark.png)
 
-- **Unified search** across all platforms with SQLite FTS5
-- **Platform theming** — Claude (amber), ChatGPT (teal), Raycast (rose)
-- **Privacy-first** — all data stays local in a SQLite database
-- **Safe re-imports** — duplicates are automatically skipped
-- **Deep linking** — shareable URLs for each conversation
-- **Keyboard-driven** — `Cmd+K` to search, `↑↓` to navigate, `?` for help
-- **Syntax highlighting** — code blocks with one-click copy
-- **Markdown rendering** — proper formatting for lists, headings, and more
+## Find more than a title
 
-## Quick Start
+- **Search titles and messages** with SQLite FTS5. Results show matching text and
+  open the conversation at the relevant message.
+- **Filter by content.** Click the colored Code, Images, Tables, Files, Audio, or
+  Video badges, or choose a content type in Filters. Combine it with a source,
+  message role, date, or search query.
+- **Save a view.** Keep a search, filters, sorting, and display settings together.
+  Saved views live in your database and are available from every device connected
+  to your instance. Update, rename, or remove a view without changing the archive.
+- **Make the list your own.** Display offers compact or comfortable rows, date or
+  source grouping, sorting, and controls for visible metadata and search previews.
+- **Move through conversations.** Previous/next controls follow the current view
+  across pages. Use `J` and `K` while reading, or open the command palette with
+  `⌘K` / `Ctrl+K`.
+- **Read comfortably.** Light and dark themes, responsive layouts, formatted
+  Markdown tables, syntax-highlighted code, and copy controls for messages and
+  links.
+- **Import complete exports.** Detect extracted folders or upload a ZIP/JSON.
+  Numbered ChatGPT JSON parts stay together; re-imports merge new messages without
+  duplicating existing ones.
 
-### Prerequisites
+## Quick start
 
-- **Docker** (recommended), OR
-- Python 3.10+ and Node.js 18+
+The [public demo](https://centralchat.fyi) uses fictional conversations. Explore
+its interface, then [run your own instance](docs/getting-started.md) to use your
+real exports. Demo saved views stay in that browser; your own instance stores
+views on the server. Every screenshot below uses synthetic demo data.
 
-### Step 1: Get Your Data
+Central Chat stores conversations and saved views in SQLite. It does not require
+AI API keys or send your archive to an AI service. A self-hosted instance sends
+data between your browser and your server. Attachment badges describe references
+found in an export; they do not mean the original files are available. Referenced
+images appear as links, and opening an external link contacts that destination.
 
-Export your chat history from each platform you use:
+## Search and shortcuts
 
-| Platform | How to Export |
-|----------|---------------|
-| **ChatGPT** | [chat.openai.com](https://chat.openai.com) → Settings → Data Controls → Export → Download ZIP |
-| **Claude** | [claude.ai/settings](https://claude.ai/settings) → Export Data → Download ZIP |
-| **Raycast** | Use [raycast-ai-exporter](https://github.com/daveonkels/raycast-ai-exporter) to export your AI chat history |
-| **Gemini** | Not available yet in [Google Takeout](https://takeout.google.com/) |
+Search normally, or combine words with operators:
 
-### Step 2: Run the App
-
-```bash
-git clone https://github.com/daveonkels/centralchat.git
-cd central-chat
-docker compose up -d
+```text
+espresso platform:claude
+"design tokens" role:assistant
+garden before:2026-06-01
 ```
 
-Open [http://localhost:3000](http://localhost:3000)
+The self-hosted search supports FTS expressions such as `coffee OR tea` and prefix
+searches such as `garden*`. Source values are `openai`, `claude`, and `raycast`.
+One content type can be selected at a time, alongside the other filters.
 
-### Step 3: Import Your Data
+| Shortcut | Action |
+| --- | --- |
+| `⌘K` / `Ctrl+K` | Open commands, saved views, filters, and actions |
+| `/` | Focus archive search |
+| `↑` / `↓`, then `Enter` | Navigate focused results and open a conversation |
+| `J` / `K` | Next / previous conversation while reading |
+| `?` | Open help when not typing in a control |
+| `Escape` | Close a dialog or clear the focused search field |
 
-1. Click **Manage Data** in the header
-2. Upload your exported ZIP or JSON files
-3. Click **Upload & Import**
+## A closer look
 
-That's it! Your conversations are now searchable.
+### Conversation reader
 
-## Searching
+![Central Chat conversation reader in light mode, using fictional messages](docs/screenshots/reader-light.png)
 
-- Type to search across all messages and conversation titles
-- Filter by platform using the filter buttons
-- Click a result to view the full conversation
+### Commands
 
-**Search operators:**
-- `platform:claude` — filter by platform (claude, openai, raycast)
-- `role:user` — filter by message role (user, assistant)
-- `before:2024-01-01` — messages before a date
+![Central Chat command palette with filters and saved views](docs/screenshots/commands.png)
 
-**Keyboard shortcuts:** Press `?` to see all shortcuts
+### On your phone
 
-## Screenshots
+<img src="docs/screenshots/mobile.png" alt="Central Chat mobile interface with fictional conversations" width="390">
 
-![Search view](docs/screenshots/centralchat-desktop-01.jpeg)
-
-![Conversation view](docs/screenshots/centralchat-desktop-02.jpeg)
-
-<img src="docs/screenshots/centralchat-mobile-01.jpeg" alt="Mobile view" width="400">
-
-## Tech Stack
+## Built with
 
 | Layer | Technology |
-|-------|------------|
+| --- | --- |
 | Frontend | React, TypeScript, Vite |
 | Backend | Python, FastAPI |
-| Database | SQLite with FTS5 full-text search |
-| Deployment | Docker, nginx |
+| Storage and search | SQLite with FTS5 |
+| Hosting | Your computer or server; Docker and nginx support |
 
-## Advanced Setup
+The interface adapts patterns from [Circle](https://github.com/ln-dev7/circle).
+Its MIT notice is retained in [the frontend licenses](frontend/public/licenses/circle.txt).
 
-<details>
-<summary><strong>Manual Setup (without Docker)</strong></summary>
+## Development
 
-### Backend
+See [Getting started](docs/getting-started.md) for Docker, local development,
+imports, and data storage. JavaScript tooling uses **pnpm 11.19.0**, as declared
+in [frontend/package.json](frontend/package.json). Use the locked dependencies;
+do not substitute another package manager.
 
-```bash
-cd backend
-python3 -m venv .venv
-source .venv/bin/activate
-pip install -r requirements.txt
-
-export DATABASE_PATH=../data/central-chat.db
-export IMPORTS_PATH=../imports
-
-uvicorn app.main:app --reload --port 8000
-```
-
-### Frontend
-
-```bash
-cd frontend
-pnpm install --frozen-lockfile
-pnpm run dev
-```
-
-</details>
-
-<details>
-<summary><strong>Server Deployment (Traefik)</strong></summary>
-
-For deployment to a server with an existing Traefik + Docker Compose setup:
-
-### 1. Copy project and build images
-
-```bash
-rsync -avz --exclude 'node_modules' --exclude '.venv' --exclude 'data/*.db' --exclude '.git' \
-  ./ yourserver:~/apps/central-chat/
-
-ssh yourserver
-cd ~/apps/central-chat
-docker build -t central-chat-backend:latest ./backend
-docker build -t central-chat-frontend:latest ./frontend
-```
-
-### 2. Create data directories
-
-```bash
-mkdir -p ~/data/central-chat/imports
-```
-
-### 3. Add to your docker-compose.yml
-
-```yaml
-central-chat-backend:
-  image: central-chat-backend:latest
-  container_name: central-chat-backend
-  restart: unless-stopped
-  volumes:
-    - ~/data/central-chat:/app/data
-    - ~/data/central-chat/imports:/app/imports:ro
-  environment:
-    - DATABASE_PATH=/app/data/central-chat.db
-    - IMPORTS_PATH=/app/imports
-  networks:
-    - proxy
-
-central-chat-frontend:
-  image: central-chat-frontend:latest
-  container_name: central-chat-frontend
-  restart: unless-stopped
-  depends_on:
-    - central-chat-backend
-  networks:
-    - proxy
-  labels:
-    - "traefik.enable=true"
-    - "traefik.http.routers.central-chat.rule=Host(`central-chat.example.com`)"
-    - "traefik.http.routers.central-chat.entrypoints=https"
-    - "traefik.http.routers.central-chat.tls=true"
-    - "traefik.http.services.central-chat.loadbalancer.server.port=80"
-    - "traefik.docker.network=proxy"
-```
-
-### 4. Start services
-
-```bash
-docker compose up -d central-chat-backend central-chat-frontend
-```
-
-</details>
-
-## Data Storage
-
-- **Database:** `data/central-chat.db`
-- **Imports:** `imports/` directory
-- Safe to delete the database and re-import at any time
-
-## Supported Export Formats
-
-| Platform | Expected File | Notes |
-|----------|---------------|-------|
-| ChatGPT | `conversations.json` | Full history with message tree structure |
-| Claude | `conversations.json` | Full history with timestamps |
-| Raycast | `raycast_ai_chats.json` | Simple format (no per-message timestamps) |
-
-## API
-
-| Endpoint | Description |
-|----------|-------------|
-| `GET /api/search?q=query` | Full-text search |
-| `GET /api/conversations` | List conversations |
-| `GET /api/conversations/{id}` | Get conversation with messages |
-| `GET /api/conversations/stats` | Database statistics |
-| `POST /api/import/run` | Trigger import |
-
-## License
-
-MIT
+Central Chat is released under the [MIT license](LICENSE).

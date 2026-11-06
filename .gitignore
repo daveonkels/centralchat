@@ -13,12 +13,10 @@ build/
 
 # Database
 data/*.db
-*.db
+*.db*
 
 # Environment
-.env
-.env.local
-.env.*.local
+.env*
 
 # IDE
 .idea/
@@ -36,7 +34,7 @@ Thumbs.db
 npm-debug.log*
 
 # Import data (user's private chat exports)
-imports/*/
+imports/*
 
 # Keep the imports directory structure
 !imports/.gitkeep

@@ -7,6 +7,7 @@ import threading
 import tempfile
 import uuid
 import zipfile
+from functools import wraps
 from typing import Callable
 
 from ..database import (
@@ -40,6 +41,22 @@ AVAILABLE_PLATFORMS = {parser.platform for parser in PARSERS}
 JOB_TTL_SECONDS = 1800
 IMPORT_JOBS: dict[str, dict] = {}
 IMPORT_JOBS_LOCK = threading.Lock()
+IMPORT_START_LOCK = threading.Lock()
+
+
+def exclusive_import_operation(fn):
+    """Atomically reserve a writer, including synchronous upload/purge requests."""
+    @wraps(fn)
+    def wrapped(*args, **kwargs):
+        if not IMPORT_START_LOCK.acquire(blocking=False):
+            raise HTTPException(status_code=409, detail="Another data operation is running")
+        try:
+            if has_active_import_job():
+                raise HTTPException(status_code=409, detail="An import is already running")
+            return fn(*args, **kwargs)
+        finally:
+            IMPORT_START_LOCK.release()
+    return wrapped
 
 
 def detect_platform_from_filename(filename: str) -> str | None:
@@ -189,7 +206,7 @@ def _find_export_folder(root: Path) -> tuple[Path, str] | None:
     if platform:
         return root, platform
 
-    for child in root.iterdir():
+    for child in sorted(root.rglob("*")):
         if child.is_dir():
             platform = detect_platform(child)
             if platform:
@@ -288,39 +305,69 @@ def _undetected_folder_reason(folder: Path) -> str:
 
 @router.get("/scan", response_model=ImportScanResult)
 def scan_imports():
-    """Scan the imports directory for export folders."""
-    imports_path = Path(IMPORTS_PATH)
-
-    if not imports_path.exists():
-        return ImportScanResult(detected_exports=[], total_folders=0)
-
+    """Discover root/nested exports without writing to the read-only source mount."""
+    imports_path = Path(IMPORTS_PATH).resolve()
     detected = []
     skipped = []
-    folders = [d for d in imports_path.iterdir() if d.is_dir()]
+    errors = []
+    total_folders = 0
 
-    for folder in folders:
-        platform = detect_platform(folder)
-        if platform:
-            detected.append({
-                "path": str(folder),
-                "name": folder.name,
-                "platform": platform,
-            })
-        else:
+    def visit(folder: Path):
+        nonlocal total_folders
+        name = str(folder.relative_to(imports_path)) if folder != imports_path else "."
+        try:
+            children = sorted(folder.iterdir())
+            total_folders += 1
+            # Do not follow symlinks outside (or back into) the imports tree.
+            if any(child.is_symlink() for child in children):
+                skipped.append({"path": str(folder), "name": name,
+                                "reason": "Symbolic links are not scanned; use real export files"})
+                return
+            platform = detect_platform(folder)
+            if platform:
+                parser = get_parser(platform)
+                if platform == "openai":
+                    files = parser._find_conversation_files(folder)
+                    invalid = [p.name for p in folder.glob("conversations-*.json") if p not in files and p.read_text().strip() != "[]"]
+                    if invalid:
+                        skipped.append({"path": str(folder), "name": name,
+                                        "reason": "Unreadable or unsupported conversation parts: " + ", ".join(invalid) + ". Finish copying the export, then rescan."})
+                        return
+                elif platform == "claude":
+                    files = [parser._find_conversations_file(folder)]
+                else:
+                    files = [parser._find_chats_file(folder)]
+                detected.append({"path": str(folder), "name": name, "platform": platform,
+                                 "file_count": len(files), "files": [p.name for p in files]})
+                return  # Export assets are not additional exports.
+            subfolders = [child for child in children if child.is_dir() and not child.name.startswith((".", "__MACOSX"))]
+            if not subfolders and folder != imports_path:
+                skipped.append({"path": str(folder), "name": name,
+                                "reason": _undetected_folder_reason(folder)})
+            for child in children:
+                if child.is_file() and child.suffix.lower() == ".zip":
+                    skipped.append({"path": str(child), "name": str(child.relative_to(imports_path)),
+                                    "reason": "Extract this ZIP into a folder here, or use Upload & Import"})
+            for child in subfolders:
+                visit(child)
+        except (OSError, ValueError, TypeError) as exc:
             skipped.append({
-                "path": str(folder),
-                "name": folder.name,
-                "reason": _undetected_folder_reason(folder),
+                "path": str(folder), "name": name, "reason": f"Could not scan export: {exc}",
             })
 
+    if not imports_path.is_dir():
+        errors.append("Imports folder is missing or unavailable. Check the server's imports mount.")
+    else:
+        visit(imports_path)
     return ImportScanResult(
-        detected_exports=detected,
-        skipped_exports=skipped,
-        total_folders=len(folders),
+        detected_exports=detected, skipped_exports=skipped,
+        total_folders=max(0, total_folders - 1),
+        imports_path=os.environ.get("IMPORTS_DISPLAY_PATH", str(imports_path)), errors=errors,
     )
 
 
 @router.post("/upload", response_model=ImportStatus)
+@exclusive_import_operation
 def upload_import(file: UploadFile = File(...)):
     """Upload a single export file (zip or json) and import it immediately."""
     if has_active_import_job():
@@ -382,35 +429,19 @@ def upload_import(file: UploadFile = File(...)):
 
 
 @router.post("/run", response_model=ImportJobResponse)
+@exclusive_import_operation
 def run_import(background_tasks: BackgroundTasks):
     """Run import for all detected exports."""
-    imports_path = Path(IMPORTS_PATH)
-
-    if not imports_path.exists():
-        job_id = create_import_job([], completed=True)
-        return get_job_snapshot(job_id)
-
+    scan = scan_imports()
+    if scan.errors:
+        raise HTTPException(status_code=400, detail="; ".join(scan.errors))
     results = []
     to_process = []
-    folders = [d for d in imports_path.iterdir() if d.is_dir()]
-
-    for folder in folders:
-        platform = detect_platform(folder)
-        if platform:
-            status = ImportStatus(
-                platform=platform,
-                source_path=str(folder),
-                status="queued",
-            )
-            results.append(status)
-            to_process.append((folder, platform, status))
-        else:
-            results.append(ImportStatus(
-                platform="unknown",
-                source_path=str(folder),
-                status="error",
-                errors=[_undetected_folder_reason(folder)],
-            ))
+    for export in scan.detected_exports:
+        folder, platform = Path(export["path"]), export["platform"]
+        status = ImportStatus(platform=platform, source_path=str(folder), status="queued")
+        results.append(status)
+        to_process.append((folder, platform, status))
 
     if not results:
         job_id = create_import_job([], completed=True)
@@ -423,6 +454,14 @@ def run_import(background_tasks: BackgroundTasks):
         mark_job_completed(job_id)
 
     return get_job_snapshot(job_id)
+
+
+@router.get("/active", response_model=ImportJobResponse | None)
+def active_import():
+    """Reconnect the modal to an import still running on the server."""
+    with IMPORT_JOBS_LOCK:
+        job_id = next((key for key, job in IMPORT_JOBS.items() if not job["completed"]), None)
+    return get_job_snapshot(job_id) if job_id else None
 
 
 @router.get("/status/{job_id}", response_model=ImportJobResponse)
@@ -457,6 +496,7 @@ def cancel_import(job_id: str):
 
 
 @router.post("/purge", response_model=PurgeResponse)
+@exclusive_import_operation
 def purge_platforms(request: PurgeRequest):
     """Permanently delete all data for one or more platforms."""
     platforms = [p.strip().lower() for p in request.platforms if p and p.strip()]
@@ -493,6 +533,7 @@ def purge_platforms(request: PurgeRequest):
 
 
 @router.post("/run/{folder_name}", response_model=ImportStatus)
+@exclusive_import_operation
 def run_import_single(folder_name: str):
     """Run import for a specific export folder."""
     folder = resolve_import_folder(folder_name)
@@ -541,10 +582,16 @@ def run_import_job(job_id: str, to_process: list[tuple[Path, str, ImportStatus]]
                     if status.status == "queued":
                         status.status = "canceled"
 
-    with get_connection() as conn:
-        rebuild_fts_index(conn)
-
-    mark_job_completed(job_id)
+    try:
+        with get_connection() as conn:
+            rebuild_fts_index(conn)
+    except Exception as exc:
+        for _, _, status in to_process:
+            if status.status == "completed":
+                status.status = "error"
+                status.errors.append(f"Data was saved, but search indexing failed: {exc}. Re-import to retry.")
+    finally:
+        mark_job_completed(job_id)
 
 
 def import_export(

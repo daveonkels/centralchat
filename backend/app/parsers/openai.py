@@ -34,26 +34,38 @@ class OpenAIParser(BaseParser):
                     data = json.load(f)
                     if isinstance(data, list) and len(data) > 0:
                         first = data[0]
-                        if "mapping" in first and "create_time" in first:
+                        if isinstance(first, dict) and "mapping" in first and "create_time" in first:
                             conversation_files.append(conv_file)
             except (json.JSONDecodeError, KeyError, OSError, UnicodeDecodeError):
                 continue
         return conversation_files
 
     @classmethod
-    def _load_conversations(cls, path: Path) -> list[dict]:
+    def _load_conversations(cls, path: Path) -> Iterator[dict]:
         conv_files = cls._find_conversation_files(path)
         if not conv_files:
             raise ValueError("Could not find any OpenAI conversations JSON files")
 
-        conversations = []
+        # A broken numbered part must not silently disappear from an import.
+        if path.is_dir():
+            for candidate in path.glob("conversations-*.json"):
+                if candidate not in conv_files:
+                    with candidate.open(encoding="utf-8") as f:
+                        if json.load(f) != []:
+                            raise ValueError(f"Invalid OpenAI conversation part: {candidate.name}")
+
         for conv_file in conv_files:
             try:
                 with open(conv_file, "r", encoding="utf-8") as f:
-                    conversations.extend(json.load(f))
+                    data = json.load(f)
+                # Release each shard before loading the next large part.
+                for conversation in data:
+                    if not isinstance(conversation, dict) or not isinstance(conversation.get("mapping"), dict):
+                        raise ValueError(f"Invalid conversation in {conv_file.name}")
+                    yield conversation
+                del data
             except (json.JSONDecodeError, OSError, UnicodeDecodeError) as exc:
                 raise ValueError(f"Could not read OpenAI export {conv_file.name}: {exc}") from exc
-        return conversations
 
     @classmethod
     def parse(cls, path: Path) -> Iterator[ParsedConversation]:

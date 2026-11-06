@@ -1,6 +1,8 @@
 from pydantic import BaseModel, Field
-from typing import Optional
+from typing import Optional, Literal
 from datetime import datetime
+
+ContentAttribute = Literal['code', 'images', 'tables', 'files', 'audio', 'video']
 
 
 class MessageBase(BaseModel):
@@ -26,6 +28,7 @@ class MessageWithMedia(MessageBase):
 
 
 class ConversationBase(BaseModel):
+    attributes: list[str] = Field(default_factory=list)
     id: str
     platform: str
     title: Optional[str] = None
@@ -45,6 +48,8 @@ class ConversationDetail(ConversationBase):
 
 
 class SearchResult(BaseModel):
+    attributes: list[str] = Field(default_factory=list)
+    conversation_matches: int = 0
     conversation_id: str
     message_id: Optional[str] = None
     entry_type: str
@@ -61,7 +66,20 @@ class SearchResult(BaseModel):
 class SearchResponse(BaseModel):
     results: list[SearchResult]
     total: int
+    conversations: int = 0
     query: str
+
+
+class ConversationTarget(BaseModel):
+    conversation_id: str
+    message_id: Optional[str] = None
+
+
+class ConversationNeighbors(BaseModel):
+    previous: Optional[ConversationTarget] = None
+    next: Optional[ConversationTarget] = None
+    position: Optional[int] = None
+    total: int
 
 
 class ImportStatus(BaseModel):
@@ -78,6 +96,8 @@ class ImportScanResult(BaseModel):
     detected_exports: list[dict]
     skipped_exports: list[dict] = Field(default_factory=list)
     total_folders: int
+    imports_path: str = ""
+    errors: list[str] = Field(default_factory=list)
 
 
 class ImportJobResponse(BaseModel):

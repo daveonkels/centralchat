@@ -156,6 +156,8 @@ def test_scan_detects_renamed_claude_json_file(tmp_path):
             "path": str(folder),
             "name": "claude-05312026",
             "platform": "claude",
+            "file_count": 1,
+            "files": ["claude-conversations-053126.json"],
         }
     ]
     assert result.skipped_exports == []

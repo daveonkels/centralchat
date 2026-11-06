@@ -2,10 +2,11 @@ import sqlite3
 import re
 from datetime import datetime
 from fastapi import APIRouter, Query, HTTPException
-from typing import Optional
+from typing import Optional, Literal
 
 from ..database import get_connection, search, count_search_results
-from ..models import SearchResponse, SearchResult
+from ..models import SearchResponse, SearchResult, ContentAttribute
+from ..content_attributes import matching_conversation_ids
 
 router = APIRouter(prefix="/api/search", tags=["search"])
 
@@ -44,11 +45,15 @@ def search_chats(
     platform: Optional[str] = Query(None, description="Filter by platform"),
     role: Optional[str] = Query(None, description="Filter by message role"),
     before: Optional[str] = Query(None, description="Only results before this date"),
+    sort: Literal['relevance', 'newest', 'oldest'] = Query('relevance'),
+    attribute: Optional[ContentAttribute] = None,
+    group_by: Literal['date', 'source', 'none'] = Query('date'),
 ):
     """Search across all messages and conversation titles."""
     before_value = normalize_before(before)
     try:
         with get_connection() as conn:
+            attribute_ids = matching_conversation_ids(conn, attribute, platform)
             results = search(
                 conn,
                 q,
@@ -57,6 +62,9 @@ def search_chats(
                 platform=platform,
                 role=role,
                 before=before_value,
+                sort=sort,
+                attribute_ids=attribute_ids,
+                group_by=group_by,
             )
             total = count_search_results(
                 conn,
@@ -64,6 +72,12 @@ def search_chats(
                 platform=platform,
                 role=role,
                 before=before_value,
+                attribute_ids=attribute_ids,
+            )
+            conversations = count_search_results(
+                conn, q, platform=platform, role=role, before=before_value,
+                distinct_conversations=True,
+                attribute_ids=attribute_ids,
             )
     except sqlite3.OperationalError:
         raise HTTPException(status_code=400, detail="Invalid search query")
@@ -71,5 +85,6 @@ def search_chats(
     return SearchResponse(
         results=[SearchResult(**r) for r in results],
         total=total,
+        conversations=conversations,
         query=q,
     )

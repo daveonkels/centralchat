@@ -1,18 +1,8 @@
-# Build stage
-FROM node:22-slim AS build
-
-WORKDIR /app
-
-COPY package.json pnpm-lock.yaml pnpm-workspace.yaml ./
-RUN corepack pnpm install --frozen-lockfile
-
-COPY . .
-RUN corepack pnpm run build
-
-# Production stage
+# Build frontend/dist with the pinned pnpm version through sfw before Docker.
+# No package-manager execution or dependency downloads occur in this image.
 FROM nginx:alpine
 
-COPY --from=build /app/dist /usr/share/nginx/html
+COPY dist/ /usr/share/nginx/html/
 COPY nginx.conf /etc/nginx/conf.d/default.conf
 
 EXPOSE 80

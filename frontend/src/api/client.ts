@@ -25,6 +25,8 @@ async function getErrorMessage(res: Response, fallback: string): Promise<string>
 }
 
 export interface SearchResult {
+  attributes?: ContentAttribute[];
+  conversation_matches: number;
   conversation_id: string;
   message_id: string | null;
   entry_type: string;
@@ -41,6 +43,7 @@ export interface SearchResult {
 export interface SearchResponse {
   results: SearchResult[];
   total: number;
+  conversations: number;
   query: string;
 }
 
@@ -62,6 +65,7 @@ export interface MediaRef {
 }
 
 export interface Conversation {
+  attributes?: ContentAttribute[];
   id: string;
   platform: string;
   title: string | null;
@@ -72,6 +76,23 @@ export interface Conversation {
   is_archived: boolean;
   message_count?: number;
   messages?: Message[];
+}
+
+export type ContentAttribute = 'code' | 'images' | 'tables' | 'files' | 'audio' | 'video';
+export interface ConversationTarget { conversation_id: string; message_id: string | null }
+export interface ConversationNeighbors {
+  previous: ConversationTarget | null; next: ConversationTarget | null;
+  position: number | null; total: number;
+}
+
+export async function getConversationNeighbors(id: string, options: {
+  q?: string; platform?: string; role?: string; before?: string; sort: string; attribute?: ContentAttribute; group_by?: 'date' | 'source' | 'none';
+}, signal: AbortSignal): Promise<ConversationNeighbors> {
+  const params = new URLSearchParams();
+  Object.entries(options).forEach(([key, value]) => { if (value) params.set(key, value); });
+  const res = await fetch(`${API_BASE}/conversations/${encodeURIComponent(id)}/neighbors?${params}`, { signal });
+  if (!res.ok) throw new Error(await getErrorMessage(res, 'Could not load conversation navigation'));
+  return res.json();
 }
 
 export interface Stats {
@@ -124,6 +145,8 @@ export interface DetectedExport {
   path: string;
   name: string;
   platform: string;
+  file_count?: number;
+  files?: string[];
 }
 
 export interface SkippedExport {
@@ -136,16 +159,21 @@ export interface ImportScanResponse {
   detected_exports: DetectedExport[];
   skipped_exports?: SkippedExport[];
   total_folders: number;
+  imports_path: string;
+  errors: string[];
 }
 
 export async function search(
   query: string,
-  options: { platform?: string; role?: string; before?: string; limit?: number; offset?: number } = {}
+  options: { platform?: string; role?: string; before?: string; sort?: string; limit?: number; offset?: number; attribute?: ContentAttribute; group_by?: 'date' | 'source' | 'none' } = {}
 ): Promise<SearchResponse> {
   const params = new URLSearchParams({ q: query });
+  if (options.attribute) params.set('attribute', options.attribute);
+  if (options.group_by) params.set('group_by', options.group_by);
   if (options.platform) params.set('platform', options.platform);
   if (options.role) params.set('role', options.role);
   if (options.before) params.set('before', options.before);
+  if (options.sort) params.set('sort', options.sort);
   if (options.limit) params.set('limit', options.limit.toString());
   if (options.offset) params.set('offset', options.offset.toString());
 
@@ -157,22 +185,26 @@ export async function search(
 }
 
 export async function getConversation(id: string): Promise<Conversation> {
-  const res = await fetch(`${API_BASE}/conversations/${id}`);
+  const res = await fetch(`${API_BASE}/conversations/${encodeURIComponent(id)}`);
   if (!res.ok) throw new Error(await getErrorMessage(res, 'Failed to load conversation'));
   return res.json();
 }
 
 export async function listConversations(
-  options: { platform?: string; limit?: number; offset?: number } = {}
-): Promise<Conversation[]> {
+  options: { platform?: string; sort?: string; limit?: number; offset?: number; attribute?: ContentAttribute; group_by?: 'date' | 'source' | 'none' } = {}
+): Promise<{ conversations: Conversation[]; total: number | null }> {
   const params = new URLSearchParams();
+  if (options.attribute) params.set('attribute', options.attribute);
+  if (options.group_by) params.set('group_by', options.group_by);
   if (options.platform) params.set('platform', options.platform);
+  if (options.sort) params.set('sort', options.sort);
   if (options.limit) params.set('limit', options.limit.toString());
   if (options.offset) params.set('offset', options.offset.toString());
 
   const res = await fetch(`${API_BASE}/conversations?${params}`);
   if (!res.ok) throw new Error(await getErrorMessage(res, 'Failed to list conversations'));
-  return res.json();
+  const total = res.headers.get('X-Total-Count');
+  return { conversations: await res.json(), total: total === null ? null : Number(total) };
 }
 
 export async function getStats(): Promise<Stats> {
@@ -196,6 +228,12 @@ export async function runImport(): Promise<ImportJobResponse> {
 export async function getImportStatus(jobId: string): Promise<ImportJobResponse> {
   const res = await fetch(`${API_BASE}/import/status/${jobId}`);
   if (!res.ok) throw new Error(await getErrorMessage(res, 'Failed to get import status'));
+  return res.json();
+}
+
+export async function getActiveImport(): Promise<ImportJobResponse | null> {
+  const res = await fetch(`${API_BASE}/import/active`);
+  if (!res.ok) throw new Error(await getErrorMessage(res, 'Failed to check active import'));
   return res.json();
 }
 

@@ -26,7 +26,7 @@ class ClaudeParser(BaseParser):
                     data = json.load(f)
                     if isinstance(data, list) and len(data) > 0:
                         first = data[0]
-                        if "uuid" in first and "chat_messages" in first:
+                        if isinstance(first, dict) and "uuid" in first and "chat_messages" in first:
                             return conv_file
             except (json.JSONDecodeError, KeyError, OSError, UnicodeDecodeError):
                 continue
