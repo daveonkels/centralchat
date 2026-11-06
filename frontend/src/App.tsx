@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { FiArchive, FiDownload, FiMenu, FiSliders, FiBookmark, FiChevronRight, FiX, FiLayers, FiSun, FiMoon } from 'react-icons/fi';
+import { FiArchive, FiUpload, FiMenu, FiSliders, FiBookmark, FiChevronRight, FiX, FiLayers, FiSun, FiMoon } from 'react-icons/fi';
 import { contentAttributes } from './components/ContentBadges';
 import DisplayOptions from './components/DisplayOptions';
 import { DEFAULT_DISPLAY, sanitizeDisplay } from './utils/display';
@@ -315,7 +315,7 @@ function App() {
           <a className="mobile-home" href="/" aria-label="Go to archive home" onClick={event => { event.preventDefault(); goHome(); }}><span className="brand-symbol"><FiLayers aria-hidden="true" /></span></a>
           <button className="icon-button mobile-menu" aria-label="Open navigation" onClick={() => setShowNav(true)}><FiMenu /></button>
           <div className="breadcrumb"><FiArchive aria-hidden="true" /><span className="breadcrumb-parent">Archive</span><FiChevronRight className="breadcrumb-divider" aria-hidden="true" /><h1>{pageTitle}</h1></div>
-          <div className="workspace-header-actions"><span className="archive-label"><span className="status-dot" />Personal archive</span><button className="icon-button theme-toggle" aria-label={`Switch to ${theme === 'dark' ? 'light' : 'dark'} theme`} title={`Switch to ${theme === 'dark' ? 'light' : 'dark'} theme`} onClick={() => setTheme(theme === 'dark' ? 'light' : 'dark')}>{theme === 'dark' ? <FiSun /> : <FiMoon />}</button><button className="primary-button" onClick={() => setShowImport(true)}><FiDownload aria-hidden="true" /><span>Import</span></button></div>
+          <div className="workspace-header-actions"><span className="archive-label"><span className="status-dot" />Personal archive</span><button className="icon-button theme-toggle" aria-label={`Switch to ${theme === 'dark' ? 'light' : 'dark'} theme`} title={`Switch to ${theme === 'dark' ? 'light' : 'dark'} theme`} onClick={() => setTheme(theme === 'dark' ? 'light' : 'dark')}>{theme === 'dark' ? <FiSun /> : <FiMoon />}</button><button className="import-action" title="Import conversations" onClick={() => setShowImport(true)}><FiUpload aria-hidden="true" /><span>Import</span></button></div>
         </header>
         <div className="workspace-tools">
           <SearchBar value={input} onChange={changeQuery} loading={loading && isSearchMode} recentSearches={recentSearches} onSelectRecent={changeQuery} onToggleHelp={() => setShowHelp(true)} onCommit={remember} onCommands={openCommands} />

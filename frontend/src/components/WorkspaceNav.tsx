@@ -1,4 +1,4 @@
-import { FiArchive, FiSearch, FiDownload, FiClock, FiHelpCircle, FiLayers, FiBookmark, FiMoreHorizontal, FiPlus } from 'react-icons/fi';
+import { FiArchive, FiSearch, FiUpload, FiClock, FiHelpCircle, FiLayers, FiBookmark, FiMoreHorizontal, FiPlus } from 'react-icons/fi';
 import { SavedView } from '../api/views';
 import { PlatformIcon } from './PlatformIcons';
 import { Stats } from '../api/client';
@@ -19,7 +19,7 @@ export default function WorkspaceNav(props: Props) {
       <div className="nav-section">
         <button className={`nav-item ${!props.activeViewId && props.searching ? 'active' : ''}`} onClick={props.onSearch}><FiSearch aria-hidden="true" /><span>Search</span><kbd>/</kbd></button>
         <button className={`nav-item ${!props.platform && !!props.activeViewId && props.searching ? 'active' : ''}`} aria-current={!props.activeViewId && !props.platform && !props.searching ? 'page' : undefined} onClick={props.onArchive}><FiArchive aria-hidden="true" /><span>All conversations</span><span className="nav-count">{props.stats?.total_conversations.toLocaleString()}</span></button>
-        <button className="nav-item" onClick={props.onImport}><FiDownload aria-hidden="true" /><span>Imports</span></button>
+        <button className="nav-item" onClick={props.onImport}><FiUpload aria-hidden="true" /><span>Imports</span></button>
       </div>
       <div className="nav-section"><h2>Sources</h2>{['openai','claude','raycast'].map(platform => <button key={platform} className={`nav-item ${!props.activeViewId && props.platform === platform ? 'active' : ''}`} aria-current={!props.activeViewId && props.platform === platform ? 'page' : undefined} onClick={() => props.onProvider(platform)}><span className={`source-icon ${platform}`}><PlatformIcon platform={platform} size={16} /></span><span>{platformName(platform)}</span><span className="nav-count">{props.stats?.by_platform[platform]?.toLocaleString() || '0'}</span></button>)}</div>
       <div className="nav-section saved-views-nav"><div className="saved-nav-heading"><h2>Saved views</h2><button className="icon-button" aria-label="Manage saved views" title="Manage saved views" onClick={props.onManageViews}><FiMoreHorizontal /></button></div>
