@@ -57,6 +57,13 @@ CREATE TABLE IF NOT EXISTS messages (
     metadata TEXT
 );
 
+-- Raycast exports have snapshot IDs, not persistent source conversation IDs.
+-- Remember every accepted snapshot so replaying an older export is idempotent.
+CREATE TABLE IF NOT EXISTS raycast_import_aliases (
+    snapshot_id TEXT PRIMARY KEY,
+    conversation_id TEXT NOT NULL REFERENCES conversations(id) ON DELETE CASCADE
+);
+
 -- Media references
 CREATE TABLE IF NOT EXISTS media_refs (
     id INTEGER PRIMARY KEY AUTOINCREMENT,

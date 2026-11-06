@@ -317,7 +317,7 @@ function ImportPanel({ onImportComplete }: ImportPanelProps) {
       {/* Import results */}
       {results.length > 0 && jobCompleted && (
         <div className="import-results" role="status">
-          <h3>{jobCanceled ? 'Import canceled' : results.some(result => result.status === 'error') ? 'Import finished with issues' : 'Import complete'}</h3>
+          <h3>{jobCanceled ? 'Import canceled' : results.some(result => result.status === 'error' || result.errors.length > 0) ? 'Import finished with issues' : 'Import complete'}</h3>
           <div className="import-summary"><div><strong>{results.reduce((sum, result) => sum + result.conversations_imported, 0).toLocaleString()}</strong><span>New conversations</span></div><div><strong>{results.reduce((sum, result) => sum + result.messages_imported, 0).toLocaleString()}</strong><span>New messages</span></div></div>
           {results.map((result, idx) => (
             <div
@@ -456,8 +456,8 @@ function ImportPanel({ onImportComplete }: ImportPanelProps) {
               </div>
             )}
             {uploadResult && (
-              <div className={`import-status ${uploadResult.status === 'completed' ? 'success' : uploadResult.status === 'error' ? 'error' : ''}`}>
-                <strong>{uploadResult.platform}</strong>: {uploadResult.status}
+              <div className={`import-status ${uploadResult.status === 'error' || uploadResult.errors.length > 0 ? 'error' : uploadResult.status === 'completed' ? 'success' : ''}`}>
+                <strong>{uploadResult.platform}</strong>: {uploadResult.status === 'completed' && uploadResult.errors.length > 0 ? 'completed with issues' : uploadResult.status}
                 {uploadResult.status !== 'error' && (
                   <> — {uploadResult.conversations_imported} conversations, {uploadResult.messages_imported} messages</>
                 )}

@@ -41,7 +41,7 @@ export function ExportGuide() {
             <li>Upload <code>~/Desktop/raycast_ai_chats.json</code>, or copy it into its own server import folder.</li>
           </ol>
           <p>Raycast’s built-in <code>.rayconfig</code> backup is not supported. Check the test output before a full export; compatibility depends on the Raycast UI.</p>
-          <p>Fresh Raycast exports can create duplicates. <a href={`${GUIDE}#if-the-import-does-not-work`} target="_blank" rel="noreferrer">Limitations and troubleshooting ↗</a></p>
+          <p>Fresh exports update uniquely matched message histories. Ambiguous matches are skipped for review. <a href={`${GUIDE}#raycast-repeat-imports`} target="_blank" rel="noreferrer">How repeat imports work ↗</a></p>
         </div>
       </details>
     </section>

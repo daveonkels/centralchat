@@ -8,8 +8,10 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 import test_imports
 from test_import_reliability import ImportReliabilityTests
+from test_raycast_identity import RaycastIdentityTests
 
 suite = unittest.defaultTestLoader.loadTestsFromTestCase(ImportReliabilityTests)
+suite.addTests(unittest.defaultTestLoader.loadTestsFromTestCase(RaycastIdentityTests))
 for name, fn in inspect.getmembers(test_imports, inspect.isfunction):
     if name.startswith('test_'):
         def check(fn=fn):

@@ -29,7 +29,8 @@ view when you want to return to it.
 
 To keep the archive current, download a fresh export and import it again.
 ChatGPT and Claude messages with stable source IDs merge into existing conversations.
-Fresh Raycast exports can create duplicates; see the [export guide's caveat](docs/exporting-your-chats.md#if-the-import-does-not-work).
+Raycast exports match existing message histories and append new replies; uncertain
+matches are flagged for review. See [how repeat imports work](docs/exporting-your-chats.md#raycast-repeat-imports).
 Folder detection runs when you rescan; it does not watch for new files automatically.
 
 ### Where do I get my files?
@@ -63,7 +64,7 @@ restrictions, Raycast setup, server-folder locations, and common import problems
   links.
 - **Import complete exports.** Detect extracted folders or upload a ZIP/JSON.
   Numbered ChatGPT JSON parts stay together; stable source IDs let re-imports
-  merge messages. See the export guide for Raycast's re-export limitation.
+  merge messages. Raycast uses conservative transcript matching for fresh exports.
 
 ## Quick start
 

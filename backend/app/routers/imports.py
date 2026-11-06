@@ -2,6 +2,7 @@ from fastapi import APIRouter, BackgroundTasks, HTTPException, UploadFile, File
 from pathlib import Path
 from datetime import datetime, timedelta
 import os
+import json
 import shutil
 import threading
 import tempfile
@@ -29,6 +30,7 @@ from ..models import (
 from ..parsers.claude import ClaudeParser
 from ..parsers.openai import OpenAIParser
 from ..parsers.raycast import RaycastParser
+from ..raycast_identity import plan_raycast_import
 
 router = APIRouter(prefix="/api/import", tags=["import"])
 
@@ -642,14 +644,23 @@ def import_export(
             conversations_imported = 0
             messages_imported = 0
 
-            for conv in parser.parse(folder):
+            parsed = parser.parse(folder)
+            raycast_plans = plan_raycast_import(conn, list(parsed)) if platform == 'raycast' else None
+            entries = (
+                ((plan.conversation, plan) for plan in raycast_plans)
+                if raycast_plans is not None else ((conv, None) for conv in parsed)
+            )
+            for conv, plan in entries:
                 if cancel_check and cancel_check():
                     status.status = "canceled"
                     break
+                status.conversations_found += 1
+                if plan and plan.error:
+                    index = json.loads(conv.metadata or '{}').get('original_index', '?')
+                    status.errors.append(f'Raycast session {index} skipped: {plan.error} No existing messages were changed.')
+                    continue
                 conv_dict = conv.to_dict()
                 conv_dict["import_id"] = import_id
-
-                status.conversations_found += 1
 
                 # Re-imports refresh conversation metadata and merge any new messages.
                 if insert_conversation(conn, conv_dict):
@@ -661,6 +672,11 @@ def import_export(
 
                 for media in conv.media_refs:
                     insert_media_ref(conn, media.to_dict())
+                if plan:
+                    conn.execute(
+                        'INSERT OR IGNORE INTO raycast_import_aliases (snapshot_id, conversation_id) VALUES (?, ?)',
+                        (plan.snapshot_id, conv.id),
+                    )
 
             # Update import record with counts
             conn.execute(

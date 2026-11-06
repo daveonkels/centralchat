@@ -63,7 +63,8 @@ class RaycastParser(BaseParser):
             else:
                 created_at = export_date
 
-            # Generate a deterministic ID based on title and index
+            # Preserve the legacy snapshot ID for exact-file compatibility.
+            # The import reconciler maps fresh snapshots to stable archive IDs.
             id_source = f"{title}:{index}:{export_date}"
             conv_id = hashlib.sha256(id_source.encode()).hexdigest()[:32]
 
@@ -79,7 +80,7 @@ class RaycastParser(BaseParser):
                 summary=None,
                 model=model,
                 is_archived=False,
-                metadata=json.dumps({"original_index": index}),
+                metadata=json.dumps({"original_index": index, "raycast_exported_at": export_date}),
             )
 
             messages = session.get("messages", [])

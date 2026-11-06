@@ -90,8 +90,10 @@ Import**. Uploads are limited to 512 MB. For larger exports, use the server fold
 method instead of uploading individual JSON parts.
 
 Re-importing the same export skips existing messages. ChatGPT and Claude exports
-with stable source IDs also merge newly added messages. Fresh Raycast exports can
-produce duplicates; see the [Raycast caveat](exporting-your-chats.md#if-the-import-does-not-work).
+with stable source IDs also merge newly added messages. Raycast matches unchanged
+message histories and their extensions, retaining existing links and adding new
+replies. See [Raycast repeat imports](exporting-your-chats.md#raycast-repeat-imports)
+for ambiguous matches and edited transcripts.
 Review the completion summary for skipped
 items or errors. **History** shows past imports; **Maintenance** contains archive
 removal controls.

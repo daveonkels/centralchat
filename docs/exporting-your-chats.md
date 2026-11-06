@@ -127,10 +127,34 @@ Review the completion summary and **History** for counts or errors. Keep exports
 private and outside Git. The public demo accepts no personal imports.
 
 To update your archive, export again and import the new files. ChatGPT and Claude
-messages with stable source IDs merge into existing conversations. **Raycast
-caveat:** its current importer derives IDs partly from the export timestamp, so
-a fresh export can create duplicates even when re-importing the identical file
-does not. Back up your database before replacing or consolidating Raycast history.
+messages with stable source IDs merge into existing conversations.
+
+## Raycast repeat imports
+
+Raycast's exporter does not provide permanent chat IDs. Central Chat compares the
+ordered message roles and text against your archive. A fresh export updates an
+existing chat when its full history matches, or when one history extends the
+other, and the match is unique in both the archive and the incoming export.
+Exact full-history matches take precedence over prefix matches.
+At least two messages must overlap for a new snapshot to be matched automatically.
+
+- Renamed titles, reordered sidebar positions, changing approximate dates, and
+  a new export timestamp do not create another copy of a uniquely matched chat.
+- New replies are appended. Existing conversation links, message links, and
+  original archive dates stay intact, including for chats imported before this fix.
+- Re-importing an older or shorter matching export retains the longer history.
+  Accepted snapshots are remembered so replaying them remains idempotent.
+- Multiple possible matches, single-message overlaps, changed content in a
+  previously accepted snapshot, and new empty chats are skipped with an explanation
+  in the import results. Other unambiguous chats in that export still import.
+- Edited or regenerated histories that diverge from the archived transcript
+  cannot reliably be identified as the same chat without a source ID. A fresh
+  snapshot with no matching history is imported separately, preserving both versions.
+
+Titles alone never identify a chat. Existing duplicate rows are not automatically
+deleted or consolidated; they can make a fresh match ambiguous. Review the import
+summary and keep a database backup before any manual cleanup. Export complete
+histories rather than manually trimming messages to improve matching.
 
 Provider instructions checked November 6, 2026; menu labels and availability can
 change. This guide verifies instructions and supported file shapes, not a fresh
