@@ -1,14 +1,34 @@
 # Central Chat
 
+[![License: MIT](https://img.shields.io/badge/license-MIT-blue)](LICENSE)
+[![Live demo](https://img.shields.io/badge/demo-live-5145a6)](https://centralchat.fyi)
+
 **A good answer is worth finding again.**
 
-Search your ChatGPT, Claude, and Raycast conversations in one personal archive.
-Import your exports, find the message you remember, and keep useful searches a
-click away. Run Central Chat on your computer or on a server you control.
+Your useful AI answers are scattered across apps and buried in old threads.
+Central Chat brings your exported ChatGPT, Claude, and Raycast conversations into
+one searchable archive on your own computer or server.
+
+Remember a Python snippet you discussed months ago, but not which app you used?
+Search once across your imported history, narrow the results to conversations
+with **Code**, and jump straight to the matching message. Save that search as a
+view when you want to return to it.
 
 [Try the interactive demo](https://centralchat.fyi) · [Get started](docs/getting-started.md) · [MIT license](LICENSE)
 
 ![Central Chat archive in dark mode, showing fictional conversations and content badges](docs/screenshots/archive-dark.png)
+
+## From scattered chats to a searchable archive
+
+1. **Export** your history from ChatGPT, Claude, or Raycast.
+2. **Import** a complete ZIP/JSON, or extract each export into its own folder and
+   use **Detect & Import**. Keep numbered ChatGPT JSON parts together.
+3. **Search** across titles and messages, filter by source or content type, and
+   save useful views.
+
+To keep the archive current, download a fresh export and import it again.
+Existing conversations are kept and new messages are merged without duplicates.
+Folder detection runs when you rescan; it does not watch for new files automatically.
 
 ## Find more than a title
 
@@ -35,15 +55,48 @@ click away. Run Central Chat on your computer or on a server you control.
 ## Quick start
 
 The [public demo](https://centralchat.fyi) uses fictional conversations. Explore
-its interface, then [run your own instance](docs/getting-started.md) to use your
-real exports. Demo saved views stay in that browser; your own instance stores
+its interface without installing anything. Demo saved views stay in that browser;
+your own instance stores
 views on the server. Every screenshot below uses synthetic demo data.
+
+To run your own instance, you need Docker Compose, Node.js 22 or later, and
+**pnpm 11.19.0**. The commands use the `sfw` package-security launcher described
+in the [setup guide](docs/getting-started.md).
+
+```sh
+git clone https://github.com/daveonkels/centralchat.git
+cd centralchat
+mkdir -p data imports
+cd frontend
+sfw pnpm install --frozen-lockfile
+sfw pnpm run build
+cd ..
+docker compose up -d --build
+```
+
+Open [localhost:3000](http://localhost:3000), choose **Import**, and add your exports.
+See the [setup guide](docs/getting-started.md) for local development, import
+instructions, and remote hosting.
+
+## Privacy and current boundaries
 
 Central Chat stores conversations and saved views in SQLite. It does not require
 AI API keys or send your archive to an AI service. A self-hosted instance sends
-data between your browser and your server. Attachment badges describe references
-found in an export; they do not mean the original files are available. Referenced
-images appear as links, and opening an external link contacts that destination.
+data between your browser and your server.
+
+- **An archive of exports.** It does not connect to your AI accounts, sync live
+  conversations, or let you send new messages to AI models.
+- **Keyword and phrase search.** Search uses SQLite FTS5; semantic search and
+  asking an AI questions about your archive are not included.
+- **Attachment references.** Images, Files, Audio, and Video badges identify
+  references in exported messages. Original attachment contents are not hosted,
+  transcribed, or indexed. Referenced images appear as links; opening an external
+  link contacts that destination.
+- **Three supported sources today:** ChatGPT, Claude, and Raycast. Other services
+  require their own importers; arbitrary JSON files are not interchangeable.
+- **A personal instance.** There are no built-in user accounts, sign-in controls,
+  or permissions for separate users. Keep remote deployments on a private network
+  or behind an authenticated reverse proxy.
 
 ## Search and shortcuts
 
