@@ -98,6 +98,34 @@ data between your browser and your server.
   or permissions for separate users. Keep remote deployments on a private network
   or behind an authenticated reverse proxy.
 
+## Help bring Grok and Gemini to Central Chat
+
+**Use Grok or Gemini? Help us validate their exports.** Neither provider is
+supported yet. We found useful community examples, but not enough evidence to
+validate conversation reconstruction and duplicate-safe updates. Both importers
+are on hold pending samples; see the [research and contribution guide](docs/importer-backlog.md).
+
+The most useful contribution is a small export of **deliberately fictional test
+chats**, downloaded through the provider's own export tool. Include multiple
+conversations, a few follow-up messages, and a second export after adding a reply.
+Code, tables, and harmless attachments help test richer content too.
+
+[Open an export-sample issue](https://github.com/daveonkels/centralchat/issues/new?title=Export%20sample%20offer%3A%20Grok%20or%20Gemini)
+with the provider, export date, format, and cases you can cover. **Do not attach
+your full personal archive.** Read the [sample checklist](docs/importer-backlog.md#contributing-a-sample)
+before sharing files; public issues and pull requests are visible to everyone.
+You can also help by testing a future importer locally without sharing your history.
+
+### Importer backlog
+
+- [ ] **Grok:** validate native account exports, message order, and repeat imports;
+  document branch and attachment limitations before an experimental release.
+- [ ] **Gemini:** validate Google Takeout **My Activity → Gemini Apps** exports,
+  conversation grouping, missing replies, and repeat exports before releasing an
+  experimental importer. Google AI Studio exports are a separate format.
+- [ ] **Release checks:** test folder detection and ZIP/JSON uploads, verify search
+  and source filters, and label experimental support and known omissions in the UI.
+
 ## Search and shortcuts
 
 Search normally, or combine words with operators:
